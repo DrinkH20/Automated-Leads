@@ -23,11 +23,11 @@ TOKEN_FILE = 'token.pickle'
 # Define the Gmail API scope
 SCOPES = ['https://www.googleapis.com/auth/gmail.readonly', 'https://www.googleapis.com/auth/gmail.compose', 'https://www.googleapis.com/auth/gmail.modify']
 
-if os.path.exists("token.pickle"):
-    os.remove("token.pickle")
-    print("token.pickle has been deleted")
-else:
-    print("token.pickle does not exist")
+# if os.path.exists("token.pickle"):
+#     os.remove("token.pickle")
+#     print("token.pickle has been deleted")
+# else:
+#     print("token.pickle does not exist")
 
 
 def authenticate_gmail():
@@ -62,48 +62,6 @@ def authenticate_gmail():
     except Exception as e:
         logging.error(f"An error occurred during authentication: {e}")
         return None
-
-
-# def fetch_emails(service, label_id='INBOX'):
-#     try:
-#         results = service.users().messages().list(userId='me', labelIds=[label_id], maxResults=10).execute()
-#         messages = results.get('messages', [])
-#
-#         emails = []
-#         for message in messages:
-#             msg = service.users().messages().get(userId='me', id=message['id']).execute()
-#             headers = msg['payload']['headers']
-#             subject = next(header['value'] for header in headers if header['name'] == 'Subject')
-#
-#             # Extract the body of the email
-#             body = get_email_body(msg['payload'])
-#
-#             emails.append({'subject': subject, 'body': body})
-#
-#         return emails
-#     except Exception as e:
-#         logging.error(f"An error occurred: {e}")
-#         return []
-#
-#
-# def get_email_body(payload):
-#     # Function to extract the full body from the payload
-#     if 'parts' in payload:
-#         parts = payload['parts']
-#         for part in parts:
-#             if part['mimeType'] == 'text/plain':
-#                 return decode_base64(part['body']['data'])
-#             elif part['mimeType'] == 'text/html':
-#                 return decode_base64(part['body']['data'])  # If you prefer HTML format
-#     elif 'body' in payload:
-#         return decode_base64(payload['body'].get('data', ''))
-#     return ""
-#
-#
-# def decode_base64(data):
-#     # Decode base64url encoded data
-#     decoded_bytes = base64.urlsafe_b64decode(data.encode('UTF-8'))
-#     return decoded_bytes.decode('UTF-8')
 
 
 def fetch_emails(service, label_id='INBOX'):
@@ -151,73 +109,6 @@ def decode_base64(data):
     decoded_bytes = base64.urlsafe_b64decode(data.encode('UTF-8'))
     return decoded_bytes.decode('UTF-8')
 
-
-# def create_label_if_not_exists(service, user_id, label_name):
-#     """Creates a new label if it doesn't exist."""
-#     try:
-#         # List existing labels
-#         label_list = service.users().labels().list(userId=user_id).execute()
-#         labels = label_list.get('labels', [])
-#
-#         # Check if the label already exists
-#         for label in labels:
-#             if label['name'] == label_name:
-#                 return label['id']
-#
-#         # If the label does not exist, create it
-#         label_body = {
-#             'name': label_name,
-#             'labelListVisibility': 'labelShow',
-#             'messageListVisibility': 'show'
-#         }
-#         label = service.users().labels().create(userId=user_id, body=label_body).execute()
-#         return label['id']
-#     except Exception as e:
-#         logging.error(f"An error occurred while creating or fetching the label: {e}")
-#         return None
-#
-#
-# def apply_label_to_message(service, user_id, message_id, label_id):
-#     """Applies the specified label to the message."""
-#     try:
-#         message_labels = {
-#             'addLabelIds': [label_id],
-#             'removeLabelIds': []
-#         }
-#         service.users().messages().modify(userId=user_id, id=message_id, body=message_labels).execute()
-#         logging.debug(f"Label applied to message ID: {message_id}")
-#     except Exception as e:
-#         logging.error(f"An error occurred while applying the label to the message: {e}")
-#
-#
-# def send_email_and_label(service, sender, subject, message_text, label_name='Leads In Process'):
-#     try:
-#         # Create the MIMEText message
-#         message = MIMEText(message_text)
-#         message['to'] = sender  # Send the email to yourself
-#         message['from'] = sender
-#         message['subject'] = subject
-#         raw = base64.urlsafe_b64encode(message.as_bytes()).decode()
-#
-#         email_body = {
-#             'raw': raw
-#         }
-#
-#         # Send the email
-#         sent_message = service.users().messages().send(userId='me', body=email_body).execute()
-#         message_id = sent_message['id']
-#         logging.debug(f"Email sent with ID: {message_id}")
-#
-#         # Create or get the label ID
-#         label_id = create_label_if_not_exists(service, 'me', label_name)
-#         if label_id:
-#             # Apply the label to the sent message
-#             apply_label_to_message(service, 'me', message_id, label_id)
-#
-#         return sent_message
-#     except Exception as e:
-#         logging.error(f"An error occurred while sending the email: {e}")
-#         return None
 
 @app.route('/')
 def index():
@@ -281,26 +172,6 @@ def index():
             print("lead not in zone")
 
     add_to_spreadsheet(all_leads)
-
-    # html_template = """
-    # <h1>Latest Emails from {{ label_id }}</h1>
-    # <ul>
-    #     {% for email in emails %}
-    #         <li>
-    #             <h3>{{ email.subject }}</h3>
-    #             <p>{{ email.body }}</p>
-    #         </li>
-    #     {% endfor %}
-    # </ul>
-    # <h2>Create a Draft</h2>
-    # <form method="post" action="{{ url_for('create_draft_route') }}">
-    #     <label for="subject">Subject:</label><br>
-    #     <input type="text" id="subject" name="subject" required><br><br>
-    #     <label for="message">Message:</label><br>
-    #     <textarea id="message" name="message" required></textarea><br><br>
-    #     <input type="submit" value="Create Draft">
-    # </form>
-    # """
 
     html_template = """
         <h1>Latest Emails from {{ label_id }}</h1>
@@ -413,30 +284,6 @@ def get_label_id(service, label_name):
     except Exception as e:
         logging.error(f"An error occurred while fetching labels: {e}")
         return None
-
-
-# @app.route('/create_draft', methods=['POST'])
-# def create_draft_route(subject, message_text):
-#     creds = authenticate_gmail()
-#     if not creds:
-#         return "Failed to authenticate with Gmail."
-#
-#     service = build('gmail', 'v1', credentials=creds, cache_discovery=False)
-#
-#     # Fetch form data
-#     # subject = request.form['subject']
-#     # message_text = request.form['message']
-#     # print(subject, message_text)
-#
-#     # Create the draft
-#     user_info = service.users().getProfile(userId='me').execute()
-#     sender_email = user_info['emailAddress']
-#     draft = create_draft(service, sender_email, subject, message_text)
-#
-#     if draft:
-#         return redirect(url_for('index'))
-#     else:
-#         return "Failed to create draft."
 
 
 if __name__ == '__main__':
