@@ -17,11 +17,17 @@ app = Flask(__name__)
 logging.basicConfig(level=logging.DEBUG)
 
 # Path to your client_secrets.json file which is actually checkmail
-CREDENTIALS_FILE = r'C:\Users\Joel Jones\AppData\Roaming\gspread_pandas\checkemail.json'
+CREDENTIALS_FILE = r'checkemail.json'
 TOKEN_FILE = 'token.pickle'
 
 # Define the Gmail API scope
-SCOPES = ['https://www.googleapis.com/auth/gmail.readonly', 'https://www.googleapis.com/auth/gmail.compose']
+SCOPES = ['https://www.googleapis.com/auth/gmail.readonly', 'https://www.googleapis.com/auth/gmail.compose', 'https://www.googleapis.com/auth/gmail.modify']
+
+if os.path.exists("token.pickle"):
+    os.remove("token.pickle")
+    print("token.pickle has been deleted")
+else:
+    print("token.pickle does not exist")
 
 
 def authenticate_gmail():
@@ -146,28 +152,72 @@ def decode_base64(data):
     return decoded_bytes.decode('UTF-8')
 
 
-def create_draft(service, sender, subject, message_text):
-    try:
-        message = MIMEText(message_text)
-
-        message['to'] = "drinkh20bois@gmail.com"
-        message['from'] = sender
-        message['subject'] = subject
-        raw = base64.urlsafe_b64encode(message.as_bytes()).decode()
-
-        draft = {
-            'message': {
-                'raw': raw
-            }
-        }
-
-        draft = service.users().drafts().create(userId='me', body=draft).execute()
-        logging.debug(f"Draft created with ID: {draft['id']}")
-        return draft
-    except Exception as e:
-        logging.error(f"An error occurred while creating a draft: {e}")
-        return None
-
+# def create_label_if_not_exists(service, user_id, label_name):
+#     """Creates a new label if it doesn't exist."""
+#     try:
+#         # List existing labels
+#         label_list = service.users().labels().list(userId=user_id).execute()
+#         labels = label_list.get('labels', [])
+#
+#         # Check if the label already exists
+#         for label in labels:
+#             if label['name'] == label_name:
+#                 return label['id']
+#
+#         # If the label does not exist, create it
+#         label_body = {
+#             'name': label_name,
+#             'labelListVisibility': 'labelShow',
+#             'messageListVisibility': 'show'
+#         }
+#         label = service.users().labels().create(userId=user_id, body=label_body).execute()
+#         return label['id']
+#     except Exception as e:
+#         logging.error(f"An error occurred while creating or fetching the label: {e}")
+#         return None
+#
+#
+# def apply_label_to_message(service, user_id, message_id, label_id):
+#     """Applies the specified label to the message."""
+#     try:
+#         message_labels = {
+#             'addLabelIds': [label_id],
+#             'removeLabelIds': []
+#         }
+#         service.users().messages().modify(userId=user_id, id=message_id, body=message_labels).execute()
+#         logging.debug(f"Label applied to message ID: {message_id}")
+#     except Exception as e:
+#         logging.error(f"An error occurred while applying the label to the message: {e}")
+#
+#
+# def send_email_and_label(service, sender, subject, message_text, label_name='Leads In Process'):
+#     try:
+#         # Create the MIMEText message
+#         message = MIMEText(message_text)
+#         message['to'] = sender  # Send the email to yourself
+#         message['from'] = sender
+#         message['subject'] = subject
+#         raw = base64.urlsafe_b64encode(message.as_bytes()).decode()
+#
+#         email_body = {
+#             'raw': raw
+#         }
+#
+#         # Send the email
+#         sent_message = service.users().messages().send(userId='me', body=email_body).execute()
+#         message_id = sent_message['id']
+#         logging.debug(f"Email sent with ID: {message_id}")
+#
+#         # Create or get the label ID
+#         label_id = create_label_if_not_exists(service, 'me', label_name)
+#         if label_id:
+#             # Apply the label to the sent message
+#             apply_label_to_message(service, 'me', message_id, label_id)
+#
+#         return sent_message
+#     except Exception as e:
+#         logging.error(f"An error occurred while sending the email: {e}")
+#         return None
 
 @app.route('/')
 def index():
@@ -178,7 +228,7 @@ def index():
     service = build('gmail', 'v1', credentials=creds, cache_discovery=False)
     logging.debug("Gmail service created successfully.")
 
-    label_name = 'leads'
+    label_name = 'LeadsNotYetContacted'
     label_id = get_label_id(service, label_name)
 
     if not label_id:
@@ -271,14 +321,13 @@ def parse_email_details(text):
     # Extract name and type of service after the word "wants"
 
     name_type_match = re.search(
-        r'To: <pdxcleanaffinity@gmail.com>\s*([\w\s]+,\s*[\w\s]+)\s+wants\s+([\w\s]+)\s+cleaning', text)
+        r'\s*([\w\s]+,\s*[\w\s]+)\s+wants\s+([\w\s]+)\s+cleaning', text)
 
     if name_type_match:
         name = name_type_match.group(1).strip()
         service_type = name_type_match.group(2).strip()
     else:
         name = service_type = None
-
 
     # This part needs work
     phone_match = re.search(r'Phone:\s*([\d\s-]+(?: x \d+)?)', text)
@@ -289,7 +338,7 @@ def parse_email_details(text):
     email = email_match.group(1) if email_match else None
 
     # Extract SQFT
-    sqft_match = re.search(r'SQFT:\s*(\d+)', text)
+    sqft_match = re.search(r'SQFT: &nbsp;\s*(\d+)', text)
     sqft = sqft_match.group(1) if sqft_match else None
 
     # Extract number of beds
@@ -307,23 +356,28 @@ def parse_email_details(text):
     else:
         address = None
 
+    print(name, email, bed, bath, sqft, phone)
+
     # UTM parameters in the specified order
     utm_order = [
-        'UTM4contentAdID',
-        'UTMreferrerURL',
-        'UTM1source',
-        'UTM2CampaignID',
-        'UTM3AdSetID'
+        'UTM4contentAdID:',
+        'UTMreferrerURL:',
+        'UTM1source:',
+        'UTM2CampaignID:',
+        'UTM3AdSetID:'
     ]
 
     utm_value = None
 
     for utm in utm_order:
-        # Capture only the value immediately following the UTM parameter, up to a line break
-        match = re.search(rf'{utm}:\s*([^\r\n]+)', text)
+        # Modify the regex to stop capturing at a line break or <br> (but not include <br> itself)
+        match = re.search(rf'{utm}\s*([^\r\n<]+)', text)
         if match:
-            utm_value = match.group(1).strip()
-            break
+            # Check if the captured value contains a <br> and strip it off if present
+            utm_value = match.group(1).split('<br>')[0].strip()
+            print("got one", utm_value)
+            if utm_value != "":
+                break
 
     return name, service_type, email, sqft, bed, bath, get_zone(address), phone, utm_value
     # return name, service_type, email, sqft, bed, bath, get_zone(address), utm_value
