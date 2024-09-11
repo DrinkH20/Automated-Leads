@@ -135,7 +135,7 @@ def create_draft(service, sender_name, sender, subject, message_text, receiver, 
 
         # Add headers
         message['to'] = receiver
-        message['from'] = formatted_sender
+        message['from'] = "hello@cleanaffinity.com"
         message['subject'] = subject
 
         # Encode the message as base64 for the Gmail API
