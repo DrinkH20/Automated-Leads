@@ -31,7 +31,10 @@ def revise_list(data):
 
     for item in data:
         # Extract each element from the tuple
-        name, service_type, email, sqft, bed, bath, zone, phone, utm_value = item
+        name, service_type, email, sqft, bed, bath, zone, phone = item[0:8]
+        print(len(item))
+        if len(item) == 9:
+            utm_value = item[8]
 
         # Prepare the revised format in columns
         revised_data.append((
