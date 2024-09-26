@@ -217,7 +217,7 @@ def parse_email_details(text):
     bed = bed_match.group(1) if bed_match else None
 
     # Extract number of baths
-    bath_match = re.search(r'Bath:\s*(\d+)', text)
+    bath_match = re.search(r'Bath:\s*([\d\.]+)', text)
     bath = bath_match.group(1) if bath_match else None
 
     # Extract the address
