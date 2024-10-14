@@ -137,6 +137,7 @@ def index():
         'monthly',
         'move',
         'onetime'
+        'onetime'
     ]
 
     for i in emails:
@@ -145,7 +146,8 @@ def index():
         try:
             in_zone = int(last_lead[6])
             try:
-                if in_zone > 0 and int(last_lead[4]) > 0 and int(last_lead[4]) > 0 and int(last_lead[3]) > 0:
+                if in_zone > 0 and int(last_lead[4]) > 0 and int(last_lead[4]) > 0:
+                    print(lead_emails_for_doubles.__contains__(last_lead[2]), last_lead[0:2], "TruFal")
                     if lead_emails_for_doubles.__contains__(last_lead[2]):
                         remove_list_item = lead_emails_for_doubles.index(last_lead[2])
                         if chart_of_profitable.index(last_lead[1]) < chart_of_profitable.index(
@@ -160,12 +162,17 @@ def index():
                             lead_emails_for_doubles.append(last_lead[2])
                             lead_type_for_doubles.append(last_lead[1])
                             print("Removed duplicate lead and replaced with better one.")
+                            print(all_leads, "This is the leads list")
                         else:
                             print("Did not add because of better duplicate.")
+                            print(all_leads, "This is the leads list")
                     else:
+                        print("added", last_lead[0:2])
                         all_leads.append(parse_email_details(get_cleaned_body(i['body'])))
                         lead_emails_for_doubles.append(last_lead[2])
                         lead_type_for_doubles.append(last_lead[1])
+
+                print(all_leads, "This is th list", last_lead[0:2])
             except TypeError:
                 print("Not all info")
         except ValueError:
