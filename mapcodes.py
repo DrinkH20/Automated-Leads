@@ -3,15 +3,38 @@ from geopy.geocoders import Nominatim
 from shapely.geometry import Point, Polygon
 import xml.etree.ElementTree as ET
 import json
-
+from opencage.geocoder import OpenCageGeocode
+from geopy.geocoders import GoogleV3
 # latitude, longitude = 0, 0
+
+
+def get_city_from_coordinates_google(latitude, longitude):
+    # Replace with your Google Maps API key
+    geolocator = GoogleV3(api_key="AIzaSyAzF17u53V310uHFnD0RoCxabjlV0wLYjQ")
+
+    # Perform reverse geocoding
+    location = geolocator.reverse((latitude, longitude), exactly_one=True)
+
+    if location:
+        # Iterate through the address components
+        for component in location.raw['address_components']:
+            if 'locality' in component['types']:
+                return component['long_name']
+            if 'administrative_area_level_2' in component['types']:  # County level if city not found
+                return component['long_name']
+            if 'administrative_area_level_1' in component['types']:  # State level
+                return component['long_name']
+
+    return "Unknown location"
 
 
 def geocode_address_google(address, api_key):
     geolocator = GoogleV3(api_key=api_key)
     location = geolocator.geocode(address)
     if location:
-        return location.latitude, location.longitude
+        city = get_city_from_coordinates_google(location.latitude, location.longitude)
+        print(city, "THIS IS THE ADDY")
+        return location.latitude, location.longitude, city
     else:
         return None
 
@@ -33,6 +56,7 @@ def geocode_address(address):
     geolocator = Nominatim(user_agent="geoapiExercises")
     location = geolocator.geocode(address)
     if location:
+        print(get_city_from_coordinates_google(location.latitude, location.longitude), "THIS IS THE ADDY")
         return location.latitude, location.longitude
     else:
         return None
@@ -958,6 +982,7 @@ def is_point_in_zone(zones, lat, lon):
 #     json.dump(zones, f)
 # Code for updating the map is above
 def get_zone(address, api_key="AIzaSyAzF17u53V310uHFnD0RoCxabjlV0wLYjQ"):
+    city = "city"
     if address:
         with open('zones.json', 'r') as f:
             zones = json.load(f)
@@ -967,7 +992,7 @@ def get_zone(address, api_key="AIzaSyAzF17u53V310uHFnD0RoCxabjlV0wLYjQ"):
         location = geocode_address_google(address, api_key)
 
         if location:
-            latitude, longitude = location
+            latitude, longitude, city = location
             # print(f"The geocoded coordinates are: Latitude = {latitude}, Longitude = {longitude}")
         else:
             print("Address could not be geocoded.")
@@ -993,5 +1018,5 @@ def get_zone(address, api_key="AIzaSyAzF17u53V310uHFnD0RoCxabjlV0wLYjQ"):
         else:
             print("Address could not be geocoded.")
 
-        return revised_zone_number
+        return revised_zone_number, city
     return "No Address Found"

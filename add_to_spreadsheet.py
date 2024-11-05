@@ -14,6 +14,7 @@ from email.utils import formataddr
 from email.mime.multipart import MIMEMultipart
 import html
 import re
+from server_price_connect import update_servers
 
 
 SCOPES = ['https://www.googleapis.com/auth/gmail.readonly', 'https://www.googleapis.com/auth/gmail.compose']
@@ -31,7 +32,13 @@ def revise_list(data):
 
     for item in data:
         # Extract each element from the tuple
-        name, service_type, email, sqft, bed, bath, zone, phone, utm_value = item
+        state_place = item[6]
+        city = state_place[1]
+        name, service_type, email, sqft, bed, bath, zone, phone = item[0:8]
+        zone = state_place[0]
+        print(len(item))
+        if len(item) == 9:
+            utm_value = item[8]
 
         # Prepare the revised format in columns
         revised_data.append((
@@ -47,13 +54,14 @@ def revise_list(data):
             email if email else "",
             phone if phone else "",
             "",
-            utm_value if utm_value else ""
+            utm_value if utm_value else "",
+            city if city else ""
         ))
         scripts_choose = ["ONETIME", "MOVE", "WEEKLY", "BIWEEKLY", "MONTHLY"]
         if ',' in name:
             last_name, first_name = name.split(',', 1)
         print(service_type.upper(), scripts_choose.index(service_type.upper()))
-        sub, body_text = autocalc(sqft, bed, bath, scripts_choose.index(service_type.upper()), first_name, last_name, "Joel")
+        sub, body_text = autocalc(sqft, bed, bath, scripts_choose.index(service_type.upper()), first_name, last_name, "Joel", city)
         create_draft_route(sub, body_text, email)
         print("create_draft")
     return revised_data
@@ -112,6 +120,7 @@ def convert_text_to_html(message_text):
     html_message = "<p>" + "</p><p>".join(message_lines) + "</p>"  # Wrap each line in <p> tags
     return html_message
 
+
 def create_draft(service, sender_name, sender, subject, message_text, receiver, label_name='Leads In Process'):
     try:
         # Create a multipart message to support both plain text and HTML content
@@ -135,7 +144,7 @@ def create_draft(service, sender_name, sender, subject, message_text, receiver, 
 
         # Add headers
         message['to'] = receiver
-        message['from'] = formatted_sender
+        message['from'] = "hello@cleanaffinity.com"
         message['subject'] = subject
 
         # Encode the message as base64 for the Gmail API
@@ -164,162 +173,6 @@ def create_draft(service, sender_name, sender, subject, message_text, receiver, 
     except Exception as e:
         logging.error(f"An error occurred while creating a draft: {e}")
         return None
-
-
-
-# def create_draft(service, sender_name, sender, subject, message_text, receiver, label_name='Leads In Process'):
-#     try:
-#         # Create a multipart message to support both plain text and HTML content
-#         message = MIMEMultipart('alternative')
-#         formatted_sender = formataddr((sender_name, sender))
-#
-#         # Define the footer with your logo and other HTML elements
-#         footer_html = """
-#                         <div dir="ltr"><img data-aii="CiExZnhMN2ttWDdra2RHdlY5Z1U4ODhUTHdlZEpVSEYwbTU" src="https://ci3.googleusercontent.com/mail-sig/AIorK4wK5N0Ul0HHETT-MTvAGX0Ry6a3go9OyEQWmOp7woQXvjOF0DXhwxdbLs-viIsdHmS9hkuL_CG6fN7M" data-os="https://lh3.googleusercontent.com/d/1fxL7kmX7kkdGvV9gU888TLwedJUHF0m5"><br><table cellpadding="0" cellspacing="0" style="color:rgb(255,255,255);font-size:medium;vertical-align:-webkit-baseline-middle;font-family:Arial"><tbody><tr><td><table cellpadding="0" cellspacing="0" style="vertical-align:-webkit-baseline-middle;font-family:Arial"><tbody><tr><td style="vertical-align:top"><table cellpadding="0" cellspacing="0" style="vertical-align:-webkit-baseline-middle;font-family:Arial"><tbody><tr><td style="text-align:center"></td></tr><tr><td height="30"></td></tr><tr><td style="text-align:center"><table cellpadding="0" cellspacing="0" style="vertical-align:-webkit-baseline-middle;font-family:Arial;display:inline-block"><tbody><tr><td><a href="https://www.facebook.com/cleanaffinity/" color="#3fcdd2" style="display:inline-block;padding:0px;background-color:rgb(63,205,210)" target="_blank"><img height="24" src="https://cdn2.hubspot.net/hubfs/53/tools/email-signature-generator/icons/facebook-icon-2x.png" alt="facebook" color="#3fcdd2" style="max-width:135px;display:block"></a></td><td width="5"><div></div></td><td><a href="https://twitter.com/clean_affinity" color="#3fcdd2" style="display:inline-block;padding:0px;background-color:rgb(63,205,210)" target="_blank"><img height="24" src="https://cdn2.hubspot.net/hubfs/53/tools/email-signature-generator/icons/twitter-icon-2x.png" alt="twitter" color="#3fcdd2" style="max-width:135px;display:block"></a></td><td width="5"><div></div></td><td><a href="https://www.linkedin.com/company/cleanaffinity" color="#3fcdd2" style="display:inline-block;padding:0px;background-color:rgb(63,205,210)" target="_blank"><img height="24" src="https://cdn2.hubspot.net/hubfs/53/tools/email-signature-generator/icons/linkedin-icon-2x.png" alt="linkedin" color="#3fcdd2" style="max-width:135px;display:block"></a></td><td width="5"><div></div></td><td><a href="https://instagram.com/cleanaffinity" color="#3fcdd2" style="display:inline-block;padding:0px;background-color:rgb(63,205,210)" target="_blank"><img height="24" src="https://cdn2.hubspot.net/hubfs/53/tools/email-signature-generator/icons/instagram-icon-2x.png" alt="instagram" color="#3fcdd2" style="max-width:135px;display:block"></a></td><td width="5"><div></div></td></tr></tbody></table></td></tr></tbody></table></td><td width="46"><div></div></td><td style="padding:0px;vertical-align:middle"><h3 color="#000000" style="margin:0px;font-size:18px;color:rgb(0,0,0)">Office Team</h3><p color="#000000" style="margin:0px;color:rgb(0,0,0);font-size:14px;line-height:22px">Clean Affinity</p><table cellpadding="0" cellspacing="0" style="vertical-align:-webkit-baseline-middle;font-family:Arial;width:234px"><tbody><tr><td height="30"></td></tr><tr><td height="1" color="#3FCDD2" style="width:234px;border-bottom:1px solid rgb(63,205,210);border-left:none;display:block"></td></tr><tr><td height="30"></td></tr></tbody></table><table cellpadding="0" cellspacing="0" style="vertical-align:-webkit-baseline-middle;font-family:Arial"><tbody><tr height="25" style="vertical-align:middle"><td width="30" style="vertical-align:middle"><table cellpadding="0" cellspacing="0" style="vertical-align:-webkit-baseline-middle;font-family:Arial"><tbody><tr><td style="vertical-align:bottom"><span width="11" color="#3FCDD2" style="display:block;background-color:rgb(63,205,210)"><img width="13" src="https://cdn2.hubspot.net/hubfs/53/tools/email-signature-generator/icons/phone-icon-2x.png" color="#3FCDD2" style="display:block"></span></td></tr></tbody></table></td><td style="padding:0px;color:rgb(0,0,0)"><a href="tel:503-933-1917" color="#000000" style="color:rgb(0,0,0);font-size:12px" target="_blank">503-933-1917</a></td></tr><tr height="25" style="vertical-align:middle"><td width="30" style="vertical-align:middle"><table cellpadding="0" cellspacing="0" style="vertical-align:-webkit-baseline-middle;font-family:Arial"><tbody><tr><td style="vertical-align:bottom"><span width="11" color="#3FCDD2" style="display:block;background-color:rgb(63,205,210)"><img width="13" src="https://cdn2.hubspot.net/hubfs/53/tools/email-signature-generator/icons/email-icon-2x.png" color="#3FCDD2" style="display:block"></span></td></tr></tbody></table></td><td style="padding:0px"><a href="mailto:hello@cleanaffinity.com" color="#000000" style="color:rgb(0,0,0);font-size:12px" target="_blank">hello@cleanaffinity.com</a></td></tr><tr height="25" style="vertical-align:middle"><td width="30" style="vertical-align:middle"><table cellpadding="0" cellspacing="0" style="vertical-align:-webkit-baseline-middle;font-family:Arial"><tbody><tr><td style="vertical-align:bottom"><span width="11" color="#3FCDD2" style="display:block;background-color:rgb(63,205,210)"><img width="13" src="https://cdn2.hubspot.net/hubfs/53/tools/email-signature-generator/icons/link-icon-2x.png" color="#3FCDD2" style="display:block"></span></td></tr></tbody></table></td><td style="padding:0px"><a href="https://www.cleanaffinity.com/" color="#000000" style="color:rgb(0,0,0);font-size:12px" target="_blank">www.cleanaffinity.com</a></td></tr><tr height="25" style="vertical-align:middle"><td width="30" style="vertical-align:middle"><br></td><td style="padding:0px"><br></td></tr></tbody></table></td></tr></tbody></table></td></tr><tr><td></td></tr></tbody></table><table cellpadding="0" cellspacing="0" style="color:rgb(255,255,255);font-size:medium;vertical-align:-webkit-baseline-middle;font-family:Arial"><tbody><tr><td><table cellpadding="0" cellspacing="0" style="vertical-align:-webkit-baseline-middle;font-family:Arial"><tbody><tr><td style="vertical-align:top"></td><td width="46"></td><td style="padding:0px;vertical-align:middle"><table cellpadding="0" cellspacing="0" style="vertical-align:-webkit-baseline-middle;font-family:Arial"><tbody><tr><td height="30"></td></tr></tbody></table></td></tr></tbody></table></td></tr></tbody></table></div>
-#                 """
-#
-#         # HTML message preserving white spaces with <pre> and adding the footer
-#         html_message = f"<pre>{message_text}</pre>{footer_html}"
-#
-#         # Plain text version of the message
-#         plain_text = message_text + "\n\nBest regards,\nClean Affinity\nYour Company Address\nPhone Number\nwww.yourwebsite.com"
-#
-#         # Attach both plain text and HTML versions of the message
-#         message.attach(MIMEText(plain_text, 'plain'))
-#         message.attach(MIMEText(html_message, 'html'))
-#
-#         # Add headers
-#         message['to'] = receiver
-#         message['from'] = formatted_sender
-#         message['subject'] = subject
-#
-#         # Encode the message as base64 for the Gmail API
-#         raw = base64.urlsafe_b64encode(message.as_bytes()).decode()
-#
-#         draft_body = {
-#             'message': {
-#                 'raw': raw
-#             }
-#         }
-#
-#         # Create the draft
-#         draft = service.users().drafts().create(userId='me', body=draft_body).execute()
-#         logging.debug(f"Draft created with ID: {draft['id']}")
-#
-#         # Retrieve the message ID from the draft
-#         message_id = draft['message']['id']
-#
-#         # Create or get the label ID
-#         label_id = create_label_if_not_exists(service, 'me', label_name)
-#         if label_id:
-#             # Apply the label to the message in the draft
-#             apply_label_to_message(service, 'me', message_id, label_id)
-#
-#         return draft
-#     except Exception as e:
-#         logging.error(f"An error occurred while creating a draft: {e}")
-#         return None
-
-
-# def create_draft(service, sender_name, sender, subject, message_text, receiver, label_name='Leads In Process'):
-#     try:
-#         # Create the MIMEText message
-#         formatted_sender = formataddr((sender_name, sender))
-#         message = MIMEMultipart('alternative')
-#         message = MIMEText(message_text)
-#
-#         # Define the footer with your logo and other HTML elements
-#         footer = """
-#                 <div dir="ltr"><img data-aii="CiExZnhMN2ttWDdra2RHdlY5Z1U4ODhUTHdlZEpVSEYwbTU" src="https://ci3.googleusercontent.com/mail-sig/AIorK4wK5N0Ul0HHETT-MTvAGX0Ry6a3go9OyEQWmOp7woQXvjOF0DXhwxdbLs-viIsdHmS9hkuL_CG6fN7M" data-os="https://lh3.googleusercontent.com/d/1fxL7kmX7kkdGvV9gU888TLwedJUHF0m5"><br><table cellpadding="0" cellspacing="0" style="color:rgb(255,255,255);font-size:medium;vertical-align:-webkit-baseline-middle;font-family:Arial"><tbody><tr><td><table cellpadding="0" cellspacing="0" style="vertical-align:-webkit-baseline-middle;font-family:Arial"><tbody><tr><td style="vertical-align:top"><table cellpadding="0" cellspacing="0" style="vertical-align:-webkit-baseline-middle;font-family:Arial"><tbody><tr><td style="text-align:center"></td></tr><tr><td height="30"></td></tr><tr><td style="text-align:center"><table cellpadding="0" cellspacing="0" style="vertical-align:-webkit-baseline-middle;font-family:Arial;display:inline-block"><tbody><tr><td><a href="https://www.facebook.com/cleanaffinity/" color="#3fcdd2" style="display:inline-block;padding:0px;background-color:rgb(63,205,210)" target="_blank"><img height="24" src="https://cdn2.hubspot.net/hubfs/53/tools/email-signature-generator/icons/facebook-icon-2x.png" alt="facebook" color="#3fcdd2" style="max-width:135px;display:block"></a></td><td width="5"><div></div></td><td><a href="https://twitter.com/clean_affinity" color="#3fcdd2" style="display:inline-block;padding:0px;background-color:rgb(63,205,210)" target="_blank"><img height="24" src="https://cdn2.hubspot.net/hubfs/53/tools/email-signature-generator/icons/twitter-icon-2x.png" alt="twitter" color="#3fcdd2" style="max-width:135px;display:block"></a></td><td width="5"><div></div></td><td><a href="https://www.linkedin.com/company/cleanaffinity" color="#3fcdd2" style="display:inline-block;padding:0px;background-color:rgb(63,205,210)" target="_blank"><img height="24" src="https://cdn2.hubspot.net/hubfs/53/tools/email-signature-generator/icons/linkedin-icon-2x.png" alt="linkedin" color="#3fcdd2" style="max-width:135px;display:block"></a></td><td width="5"><div></div></td><td><a href="https://instagram.com/cleanaffinity" color="#3fcdd2" style="display:inline-block;padding:0px;background-color:rgb(63,205,210)" target="_blank"><img height="24" src="https://cdn2.hubspot.net/hubfs/53/tools/email-signature-generator/icons/instagram-icon-2x.png" alt="instagram" color="#3fcdd2" style="max-width:135px;display:block"></a></td><td width="5"><div></div></td></tr></tbody></table></td></tr></tbody></table></td><td width="46"><div></div></td><td style="padding:0px;vertical-align:middle"><h3 color="#000000" style="margin:0px;font-size:18px;color:rgb(0,0,0)">Office Team</h3><p color="#000000" style="margin:0px;color:rgb(0,0,0);font-size:14px;line-height:22px">Clean Affinity</p><table cellpadding="0" cellspacing="0" style="vertical-align:-webkit-baseline-middle;font-family:Arial;width:234px"><tbody><tr><td height="30"></td></tr><tr><td height="1" color="#3FCDD2" style="width:234px;border-bottom:1px solid rgb(63,205,210);border-left:none;display:block"></td></tr><tr><td height="30"></td></tr></tbody></table><table cellpadding="0" cellspacing="0" style="vertical-align:-webkit-baseline-middle;font-family:Arial"><tbody><tr height="25" style="vertical-align:middle"><td width="30" style="vertical-align:middle"><table cellpadding="0" cellspacing="0" style="vertical-align:-webkit-baseline-middle;font-family:Arial"><tbody><tr><td style="vertical-align:bottom"><span width="11" color="#3FCDD2" style="display:block;background-color:rgb(63,205,210)"><img width="13" src="https://cdn2.hubspot.net/hubfs/53/tools/email-signature-generator/icons/phone-icon-2x.png" color="#3FCDD2" style="display:block"></span></td></tr></tbody></table></td><td style="padding:0px;color:rgb(0,0,0)"><a href="tel:503-933-1917" color="#000000" style="color:rgb(0,0,0);font-size:12px" target="_blank">503-933-1917</a></td></tr><tr height="25" style="vertical-align:middle"><td width="30" style="vertical-align:middle"><table cellpadding="0" cellspacing="0" style="vertical-align:-webkit-baseline-middle;font-family:Arial"><tbody><tr><td style="vertical-align:bottom"><span width="11" color="#3FCDD2" style="display:block;background-color:rgb(63,205,210)"><img width="13" src="https://cdn2.hubspot.net/hubfs/53/tools/email-signature-generator/icons/email-icon-2x.png" color="#3FCDD2" style="display:block"></span></td></tr></tbody></table></td><td style="padding:0px"><a href="mailto:hello@cleanaffinity.com" color="#000000" style="color:rgb(0,0,0);font-size:12px" target="_blank">hello@cleanaffinity.com</a></td></tr><tr height="25" style="vertical-align:middle"><td width="30" style="vertical-align:middle"><table cellpadding="0" cellspacing="0" style="vertical-align:-webkit-baseline-middle;font-family:Arial"><tbody><tr><td style="vertical-align:bottom"><span width="11" color="#3FCDD2" style="display:block;background-color:rgb(63,205,210)"><img width="13" src="https://cdn2.hubspot.net/hubfs/53/tools/email-signature-generator/icons/link-icon-2x.png" color="#3FCDD2" style="display:block"></span></td></tr></tbody></table></td><td style="padding:0px"><a href="https://www.cleanaffinity.com/" color="#000000" style="color:rgb(0,0,0);font-size:12px" target="_blank">www.cleanaffinity.com</a></td></tr><tr height="25" style="vertical-align:middle"><td width="30" style="vertical-align:middle"><br></td><td style="padding:0px"><br></td></tr></tbody></table></td></tr></tbody></table></td></tr><tr><td></td></tr></tbody></table><table cellpadding="0" cellspacing="0" style="color:rgb(255,255,255);font-size:medium;vertical-align:-webkit-baseline-middle;font-family:Arial"><tbody><tr><td><table cellpadding="0" cellspacing="0" style="vertical-align:-webkit-baseline-middle;font-family:Arial"><tbody><tr><td style="vertical-align:top"></td><td width="46"></td><td style="padding:0px;vertical-align:middle"><table cellpadding="0" cellspacing="0" style="vertical-align:-webkit-baseline-middle;font-family:Arial"><tbody><tr><td height="30"></td></tr></tbody></table></td></tr></tbody></table></td></tr></tbody></table></div>
-#                 """
-#
-#         # Combine the message text with the footer
-#         full_message_html = f"<p>{message_text}</p>{footer}"
-#
-#         # Attach both plain text and HTML versions of the message
-#         message.attach(MIMEText(message_text, 'plain'))
-#         message.attach(MIMEText(full_message_html, 'html'))
-#         print("draft being created")
-#
-#         message['to'] = receiver
-#         message['from'] = "hello@cleanaffinity.com"
-#         message['subject'] = subject
-#         raw = base64.urlsafe_b64encode(message.as_bytes()).decode()
-#
-#         draft_body = {
-#             'message': {
-#                 'raw': raw
-#             }
-#         }
-#
-#         # Create the draft
-#         draft = service.users().drafts().create(userId='me', body=draft_body).execute()
-#         logging.debug(f"Draft created with ID: {draft['id']}")
-#
-#         # Retrieve the message ID from the draft
-#         message_id = draft['message']['id']
-#
-#         # Create or get the label ID
-#         label_id = create_label_if_not_exists(service, 'me', label_name)
-#         if label_id:
-#             # Apply the label to the message in the draft
-#             apply_label_to_message(service, 'me', message_id, label_id)
-#
-#         return draft
-#     except Exception as e:
-#         logging.error(f"An error occurred while creating a draft: {e}")
-#         return None
-
-
-# def create_draft(service, sender_name, sender, subject, message_text, receiver, label_name='Leads In Process'):
-#     try:
-#         # Create a multipart message to support both plain text and HTML content
-#         message = MIMEMultipart('alternative')
-#         formatted_sender = formataddr((sender_name, sender))
-#
-#         # Define the footer with your logo and other HTML elements
-#         footer = """
-#         <div dir="ltr"><img data-aii="CiExZnhMN2ttWDdra2RHdlY5Z1U4ODhUTHdlZEpVSEYwbTU" src="https://ci3.googleusercontent.com/mail-sig/AIorK4wK5N0Ul0HHETT-MTvAGX0Ry6a3go9OyEQWmOp7woQXvjOF0DXhwxdbLs-viIsdHmS9hkuL_CG6fN7M" data-os="https://lh3.googleusercontent.com/d/1fxL7kmX7kkdGvV9gU888TLwedJUHF0m5"><br><table cellpadding="0" cellspacing="0" style="color:rgb(255,255,255);font-size:medium;vertical-align:-webkit-baseline-middle;font-family:Arial"><tbody><tr><td><table cellpadding="0" cellspacing="0" style="vertical-align:-webkit-baseline-middle;font-family:Arial"><tbody><tr><td style="vertical-align:top"><table cellpadding="0" cellspacing="0" style="vertical-align:-webkit-baseline-middle;font-family:Arial"><tbody><tr><td style="text-align:center"></td></tr><tr><td height="30"></td></tr><tr><td style="text-align:center"><table cellpadding="0" cellspacing="0" style="vertical-align:-webkit-baseline-middle;font-family:Arial;display:inline-block"><tbody><tr><td><a href="https://www.facebook.com/cleanaffinity/" color="#3fcdd2" style="display:inline-block;padding:0px;background-color:rgb(63,205,210)" target="_blank"><img height="24" src="https://cdn2.hubspot.net/hubfs/53/tools/email-signature-generator/icons/facebook-icon-2x.png" alt="facebook" color="#3fcdd2" style="max-width:135px;display:block"></a></td><td width="5"><div></div></td><td><a href="https://twitter.com/clean_affinity" color="#3fcdd2" style="display:inline-block;padding:0px;background-color:rgb(63,205,210)" target="_blank"><img height="24" src="https://cdn2.hubspot.net/hubfs/53/tools/email-signature-generator/icons/twitter-icon-2x.png" alt="twitter" color="#3fcdd2" style="max-width:135px;display:block"></a></td><td width="5"><div></div></td><td><a href="https://www.linkedin.com/company/cleanaffinity" color="#3fcdd2" style="display:inline-block;padding:0px;background-color:rgb(63,205,210)" target="_blank"><img height="24" src="https://cdn2.hubspot.net/hubfs/53/tools/email-signature-generator/icons/linkedin-icon-2x.png" alt="linkedin" color="#3fcdd2" style="max-width:135px;display:block"></a></td><td width="5"><div></div></td><td><a href="https://instagram.com/cleanaffinity" color="#3fcdd2" style="display:inline-block;padding:0px;background-color:rgb(63,205,210)" target="_blank"><img height="24" src="https://cdn2.hubspot.net/hubfs/53/tools/email-signature-generator/icons/instagram-icon-2x.png" alt="instagram" color="#3fcdd2" style="max-width:135px;display:block"></a></td><td width="5"><div></div></td></tr></tbody></table></td></tr></tbody></table></td><td width="46"><div></div></td><td style="padding:0px;vertical-align:middle"><h3 color="#000000" style="margin:0px;font-size:18px;color:rgb(0,0,0)">Office Team</h3><p color="#000000" style="margin:0px;color:rgb(0,0,0);font-size:14px;line-height:22px">Clean Affinity</p><table cellpadding="0" cellspacing="0" style="vertical-align:-webkit-baseline-middle;font-family:Arial;width:234px"><tbody><tr><td height="30"></td></tr><tr><td height="1" color="#3FCDD2" style="width:234px;border-bottom:1px solid rgb(63,205,210);border-left:none;display:block"></td></tr><tr><td height="30"></td></tr></tbody></table><table cellpadding="0" cellspacing="0" style="vertical-align:-webkit-baseline-middle;font-family:Arial"><tbody><tr height="25" style="vertical-align:middle"><td width="30" style="vertical-align:middle"><table cellpadding="0" cellspacing="0" style="vertical-align:-webkit-baseline-middle;font-family:Arial"><tbody><tr><td style="vertical-align:bottom"><span width="11" color="#3FCDD2" style="display:block;background-color:rgb(63,205,210)"><img width="13" src="https://cdn2.hubspot.net/hubfs/53/tools/email-signature-generator/icons/phone-icon-2x.png" color="#3FCDD2" style="display:block"></span></td></tr></tbody></table></td><td style="padding:0px;color:rgb(0,0,0)"><a href="tel:503-933-1917" color="#000000" style="color:rgb(0,0,0);font-size:12px" target="_blank">503-933-1917</a></td></tr><tr height="25" style="vertical-align:middle"><td width="30" style="vertical-align:middle"><table cellpadding="0" cellspacing="0" style="vertical-align:-webkit-baseline-middle;font-family:Arial"><tbody><tr><td style="vertical-align:bottom"><span width="11" color="#3FCDD2" style="display:block;background-color:rgb(63,205,210)"><img width="13" src="https://cdn2.hubspot.net/hubfs/53/tools/email-signature-generator/icons/email-icon-2x.png" color="#3FCDD2" style="display:block"></span></td></tr></tbody></table></td><td style="padding:0px"><a href="mailto:hello@cleanaffinity.com" color="#000000" style="color:rgb(0,0,0);font-size:12px" target="_blank">hello@cleanaffinity.com</a></td></tr><tr height="25" style="vertical-align:middle"><td width="30" style="vertical-align:middle"><table cellpadding="0" cellspacing="0" style="vertical-align:-webkit-baseline-middle;font-family:Arial"><tbody><tr><td style="vertical-align:bottom"><span width="11" color="#3FCDD2" style="display:block;background-color:rgb(63,205,210)"><img width="13" src="https://cdn2.hubspot.net/hubfs/53/tools/email-signature-generator/icons/link-icon-2x.png" color="#3FCDD2" style="display:block"></span></td></tr></tbody></table></td><td style="padding:0px"><a href="https://www.cleanaffinity.com/" color="#000000" style="color:rgb(0,0,0);font-size:12px" target="_blank">www.cleanaffinity.com</a></td></tr><tr height="25" style="vertical-align:middle"><td width="30" style="vertical-align:middle"><br></td><td style="padding:0px"><br></td></tr></tbody></table></td></tr></tbody></table></td></tr><tr><td></td></tr></tbody></table><table cellpadding="0" cellspacing="0" style="color:rgb(255,255,255);font-size:medium;vertical-align:-webkit-baseline-middle;font-family:Arial"><tbody><tr><td><table cellpadding="0" cellspacing="0" style="vertical-align:-webkit-baseline-middle;font-family:Arial"><tbody><tr><td style="vertical-align:top"></td><td width="46"></td><td style="padding:0px;vertical-align:middle"><table cellpadding="0" cellspacing="0" style="vertical-align:-webkit-baseline-middle;font-family:Arial"><tbody><tr><td height="30"></td></tr></tbody></table></td></tr></tbody></table></td></tr></tbody></table></div>
-#         """
-#
-#         # Combine the message text with the footer
-#         full_message_html = f"<p>{message_text}</p>{footer}"
-#
-#         # Attach both plain text and HTML versions of the message
-#         message.attach(MIMEText(message_text, 'plain'))
-#         message.attach(MIMEText(full_message_html, 'html'))
-#
-#         # Add headers
-#         message['to'] = receiver
-#         message['from'] = formatted_sender
-#         message['subject'] = subject
-#
-#         # Encode the message as base64 for the Gmail API
-#         raw = base64.urlsafe_b64encode(message.as_bytes()).decode()
-#
-#         draft_body = {
-#             'message': {
-#                 'raw': raw
-#             }
-#         }
-#
-#         # Create the draft
-#         draft = service.users().drafts().create(userId='me', body=draft_body).execute()
-#         logging.debug(f"Draft created with ID: {draft['id']}")
-#
-#         # Retrieve the message ID from the draft
-#         message_id = draft['message']['id']
-#
-#         # Create or get the label ID
-#         label_id = create_label_if_not_exists(service, 'me', label_name)
-#         if label_id:
-#             # Apply the label to the message in the draft
-#             apply_label_to_message(service, 'me', message_id, label_id)
-#
-#         return draft
-#     except Exception as e:
-#         logging.error(f"An error occurred while creating a draft: {e}")
-#         return None
 
 
 def authenticate_gmail():
@@ -371,7 +224,7 @@ def create_draft_route(subject, message_text, gmail):
 
 def add_to_spreadsheet(raw_data):
     # Path to your credentials.json file
-    creds_file = r'C:\Users\Joel Jones\AppData\Roaming\gspread_pandas\emailsenderthingy.json'
+    creds_file = r'emailsenderthingy.json'
 
     # Connect to the Google Sheets API
     creds = Credentials.from_service_account_file(creds_file, scopes=["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive", 'https://www.googleapis.com/auth/gmail.modify'])
@@ -382,6 +235,7 @@ def add_to_spreadsheet(raw_data):
     sheet_name = 'Sheet1'  # Replace with your actual sheet name
 
     # print("eawe", raw_data)
+    print(raw_data, "THSI WE RAWWW")
     data = revise_list(raw_data)
     # print("rege", data)
 
@@ -391,7 +245,7 @@ def add_to_spreadsheet(raw_data):
 
         for item in data:
             # Ensure each item has exactly 12 columns
-            if len(item) != 15:
+            if len(item) != 16:
                 print(f"Skipping item with incorrect number of columns: {item}")
                 continue
 
@@ -415,7 +269,11 @@ def add_to_spreadsheet(raw_data):
 today = date.today()
 months_list = ("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December")
 month = months_list[today.month-1]
-ot, initial, move, monthly, biweekly, weekly = 2.552, 1.792375, 2.9348, 1.3965, 1.01, 0.909
+
+
+def update_prices():
+    ot, initial, move, monthly, biweekly, weekly = map(float, update_servers())
+    print("Price successfully updated!")
 
 
 def calc_sqft_price(sqft):
@@ -438,8 +296,8 @@ def calc_sqft_price(sqft):
     return sqft_price
 
 
-def autocalc(sqft, beds, baths, type_clean, name_first, name_last, username):
-    print(sqft, beds, baths, type_clean, name_first, name_last, username)
+def autocalc(sqft, beds, baths, type_clean, name_first, name_last, username, city):
+    print(sqft, beds, baths, type_clean, name_first, name_last, username, city)
     elite = 250
     ongoing = 140
     try:
@@ -473,7 +331,7 @@ def autocalc(sqft, beds, baths, type_clean, name_first, name_last, username):
                     elite = 250
 
                 title = get_title(sqft, beds, baths, type_clean, name_last, name_first)
-                main_info = get_quote(month, round(elite), round(ongoing), type_clean, name_first, username)
+                main_info = get_quote(month, round(elite), round(ongoing), type_clean, name_first, username, city)
 
             except ValueError and UnboundLocalError and IndexError and UnboundLocalError:
                 print("Error Loading Quote")
@@ -520,7 +378,7 @@ def get_title(sqft, beds, baths, part_list, last, first):
     return scripts[part_list]
 
 
-def get_quote(date_month, initial, recuring, part_list, name="there", username=""):
+def get_quote(date_month, initial, recuring, part_list, name="there", username="", city=""):
     scripts = [f"""Hi{name},
 
 We're grateful for the opportunity to help with your cleaning needs!
@@ -661,31 +519,3 @@ We look forward to cleaning for you!
 {username}
 """
     return scripts
-
-
-
-# def create_draft(service, sender_name, sender_email, subject, message_text, receiver):
-#     try:
-#         # Format the sender with the display name and email
-#         formatted_sender = formataddr((sender_name, sender_email))
-#
-#         # Create the MIMEText message
-#         message = MIMEText(message_text, "html")  # Use "html" if your message contains HTML
-#
-#         message['to'] = receiver
-#         message['from'] = formatted_sender  # Set the "From" header with display name
-#         message['subject'] = subject
-#         raw = base64.urlsafe_b64encode(message.as_bytes()).decode()
-#
-#         draft_body = {
-#             'message': {
-#                 'raw': raw
-#             }
-#         }
-#
-#         draft = service.users().drafts().create(userId='me', body=draft_body).execute()
-#         logging.debug(f"Draft created with ID: {draft['id']}")
-#         return draft
-#     except Exception as e:
-#         logging.error(f"An error occurred while creating a draft: {e}")
-#         return None
