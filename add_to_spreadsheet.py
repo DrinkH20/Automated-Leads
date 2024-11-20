@@ -272,6 +272,7 @@ month = months_list[today.month-1]
 
 
 def update_prices():
+    global ot, initial, move, monthly, biweekly, weekly
     ot, initial, move, monthly, biweekly, weekly = map(float, update_servers())
     print("Price successfully updated!")
 
