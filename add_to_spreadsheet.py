@@ -14,6 +14,7 @@ from email.utils import formataddr
 from email.mime.multipart import MIMEMultipart
 import html
 import re
+from server_price_connect import update_servers
 
 
 SCOPES = ['https://www.googleapis.com/auth/gmail.readonly', 'https://www.googleapis.com/auth/gmail.compose']
@@ -31,7 +32,10 @@ def revise_list(data):
 
     for item in data:
         # Extract each element from the tuple
+        state_place = item[6]
+        city = state_place[1]
         name, service_type, email, sqft, bed, bath, zone, phone = item[0:8]
+        zone = state_place[0]
         print(len(item))
         if len(item) == 9:
             utm_value = item[8]
@@ -50,13 +54,14 @@ def revise_list(data):
             email if email else "",
             phone if phone else "",
             "",
-            utm_value if utm_value else ""
+            utm_value if utm_value else "",
+            city if city else ""
         ))
         scripts_choose = ["ONETIME", "MOVE", "WEEKLY", "BIWEEKLY", "MONTHLY"]
         if ',' in name:
             last_name, first_name = name.split(',', 1)
         print(service_type.upper(), scripts_choose.index(service_type.upper()))
-        sub, body_text = autocalc(sqft, bed, bath, scripts_choose.index(service_type.upper()), first_name, last_name, "Joel")
+        sub, body_text = autocalc(sqft, bed, bath, scripts_choose.index(service_type.upper()), first_name, last_name, "Joel", city)
         create_draft_route(sub, body_text, email)
         print("create_draft")
     return revised_data
@@ -114,6 +119,7 @@ def convert_text_to_html(message_text):
     message_lines = escaped_message_text.splitlines()  # Split message into lines based on line breaks
     html_message = "<p>" + "</p><p>".join(message_lines) + "</p>"  # Wrap each line in <p> tags
     return html_message
+
 
 def create_draft(service, sender_name, sender, subject, message_text, receiver, label_name='Leads In Process'):
     try:
@@ -229,6 +235,7 @@ def add_to_spreadsheet(raw_data):
     sheet_name = 'Sheet1'  # Replace with your actual sheet name
 
     # print("eawe", raw_data)
+    print(raw_data, "THSI WE RAWWW")
     data = revise_list(raw_data)
     # print("rege", data)
 
@@ -238,7 +245,7 @@ def add_to_spreadsheet(raw_data):
 
         for item in data:
             # Ensure each item has exactly 12 columns
-            if len(item) != 15:
+            if len(item) != 16:
                 print(f"Skipping item with incorrect number of columns: {item}")
                 continue
 
@@ -262,7 +269,12 @@ def add_to_spreadsheet(raw_data):
 today = date.today()
 months_list = ("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December")
 month = months_list[today.month-1]
-ot, initial, move, monthly, biweekly, weekly = 2.552, 1.792375, 2.9348, 1.3965, 1.01, 0.909
+
+
+def update_prices():
+    global ot, initial, move, monthly, biweekly, weekly
+    ot, initial, move, monthly, biweekly, weekly = map(float, update_servers())
+    print("Price successfully updated!")
 
 
 def calc_sqft_price(sqft):
@@ -285,8 +297,8 @@ def calc_sqft_price(sqft):
     return sqft_price
 
 
-def autocalc(sqft, beds, baths, type_clean, name_first, name_last, username):
-    print(sqft, beds, baths, type_clean, name_first, name_last, username)
+def autocalc(sqft, beds, baths, type_clean, name_first, name_last, username, city):
+    print(sqft, beds, baths, type_clean, name_first, name_last, username, city)
     elite = 250
     ongoing = 140
     try:
@@ -320,7 +332,7 @@ def autocalc(sqft, beds, baths, type_clean, name_first, name_last, username):
                     elite = 250
 
                 title = get_title(sqft, beds, baths, type_clean, name_last, name_first)
-                main_info = get_quote(month, round(elite), round(ongoing), type_clean, name_first, username)
+                main_info = get_quote(month, round(elite), round(ongoing), type_clean, name_first, username, city)
 
             except ValueError and UnboundLocalError and IndexError and UnboundLocalError:
                 print("Error Loading Quote")
@@ -367,7 +379,7 @@ def get_title(sqft, beds, baths, part_list, last, first):
     return scripts[part_list]
 
 
-def get_quote(date_month, initial, recuring, part_list, name="there", username=""):
+def get_quote(date_month, initial, recuring, part_list, name="there", username="", city=""):
     scripts = [f"""Hi{name},
 
 We're grateful for the opportunity to help with your cleaning needs!

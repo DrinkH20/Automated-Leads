@@ -1,3 +1,4 @@
+from add_to_spreadsheet import update_prices
 from flask import Flask, render_template_string, request, redirect, url_for
 from google.auth.transport.requests import Request
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -23,14 +24,15 @@ TOKEN_FILE = 'token.pickle'
 # Define the Gmail API scope
 SCOPES = ['https://www.googleapis.com/auth/gmail.readonly', 'https://www.googleapis.com/auth/gmail.compose', 'https://www.googleapis.com/auth/gmail.modify']
 
-# if os.path.exists("token.pickle"):
-#     os.remove("token.pickle")
-#     print("token.pickle has been deleted")
-# else:
-#     print("token.pickle does not exist")
+if os.path.exists("token.pickle"):
+    os.remove("token.pickle")
+    print("token.pickle has been deleted")
+else:
+    print("token.pickle does not exist")
 
 
 def authenticate_gmail():
+    update_prices()
     try:
         creds = None
         logging.debug("Starting authentication process.")
@@ -144,10 +146,11 @@ def index():
         check_first = parse_email_details(get_cleaned_body(i['body']))
         last_lead = check_first
         try:
-            in_zone = int(last_lead[6])
+            state_parts = last_lead[6]
+            in_zone = int(state_parts[0])
+            # print(state_parts[1])
             try:
-                if in_zone > 0 and int(last_lead[4]) > 0 and int(last_lead[4]) > 0:
-                    print(lead_emails_for_doubles.__contains__(last_lead[2]), last_lead[0:2], "TruFal")
+                if in_zone > 0 and int(last_lead[4]) > 0:
                     if lead_emails_for_doubles.__contains__(last_lead[2]):
                         remove_list_item = lead_emails_for_doubles.index(last_lead[2])
                         if chart_of_profitable.index(last_lead[1]) < chart_of_profitable.index(
@@ -162,17 +165,13 @@ def index():
                             lead_emails_for_doubles.append(last_lead[2])
                             lead_type_for_doubles.append(last_lead[1])
                             print("Removed duplicate lead and replaced with better one.")
-                            print(all_leads, "This is the leads list")
                         else:
                             print("Did not add because of better duplicate.")
-                            print(all_leads, "This is the leads list")
                     else:
                         print("added", last_lead[0:2])
                         all_leads.append(parse_email_details(get_cleaned_body(i['body'])))
                         lead_emails_for_doubles.append(last_lead[2])
                         lead_type_for_doubles.append(last_lead[1])
-
-                print(all_leads, "This is th list", last_lead[0:2])
             except TypeError:
                 print("Not all info")
         except ValueError:
