@@ -1,45 +1,47 @@
-from geopy.geocoders import GoogleV3
+# from geopy.geocoders import GoogleV3
 from geopy.geocoders import Nominatim
 from shapely.geometry import Point, Polygon
 import xml.etree.ElementTree as ET
 import json
-from opencage.geocoder import OpenCageGeocode
+# from opencage.geocoder import OpenCageGeocode
 from geopy.geocoders import GoogleV3
 # latitude, longitude = 0, 0
 
+# Trying to make sure we do not use the city api if not needed
+# # def get_city_from_coordinates_google(latitude, longitude):
+# #     # Replace with your Google Maps API key
+# #     geolocator = GoogleV3(api_key="AIzaSyAzF17u53V310uHFnD0RoCxabjlV0wLYjQ")
+# #
+# #     # Perform reverse geocoding
+# #     location = geolocator.reverse((latitude, longitude), exactly_one=True)
+# #
+# #     if location:
+# #         # Iterate through the address components
+# #         for component in location.raw['address_components']:
+# #             if 'locality' in component['types']:
+# #                 return component['long_name']
+# #             if 'administrative_area_level_2' in component['types']:  # County level if city not found
+# #                 return component['long_name']
+# #             if 'administrative_area_level_1' in component['types']:  # State level
+# #                 return component['long_name']
+# #
+# #     return "Unknown location"
 
-def get_city_from_coordinates_google(latitude, longitude):
-    # Replace with your Google Maps API key
-    geolocator = GoogleV3(api_key="AIzaSyAzF17u53V310uHFnD0RoCxabjlV0wLYjQ")
 
-    # Perform reverse geocoding
-    location = geolocator.reverse((latitude, longitude), exactly_one=True)
-
-    if location:
-        # Iterate through the address components
-        for component in location.raw['address_components']:
-            if 'locality' in component['types']:
-                return component['long_name']
-            if 'administrative_area_level_2' in component['types']:  # County level if city not found
-                return component['long_name']
-            if 'administrative_area_level_1' in component['types']:  # State level
-                return component['long_name']
-
-    return "Unknown location"
-
-
+# Untab these if we need the city
 def geocode_address_google(address, api_key):
     geolocator = GoogleV3(api_key=api_key)
     location = geolocator.geocode(address)
     if location:
-        city = get_city_from_coordinates_google(location.latitude, location.longitude)
-        print(city, "THIS IS THE ADDY")
-        return location.latitude, location.longitude, city
+        # city = get_city_from_coordinates_google(location.latitude, location.longitude)
+        # print(city, "THIS IS THE ADDY")
+        # return location.latitude, location.longitude, city
+        return location.latitude, location.longitude
     else:
         return None
 
 
-# ADD ADDRESS HERE
+# ADD ADDRESS HERE -- This should not be untabbed
 # api_key = "AIzaSyAzF17u53V310uHFnD0RoCxabjlV0wLYjQ"  # Replace with your Google API key
 # address = "11955 SW Edgewood St, Portland, OR 97225"
 # location = geocode_address_google(address, api_key)
@@ -56,7 +58,7 @@ def geocode_address(address):
     geolocator = Nominatim(user_agent="geoapiExercises")
     location = geolocator.geocode(address)
     if location:
-        print(get_city_from_coordinates_google(location.latitude, location.longitude), "THIS IS THE ADDY")
+        # print(get_city_from_coordinates_google(location.latitude, location.longitude), "THIS IS THE ADDY")
         return location.latitude, location.longitude
     else:
         return None
@@ -992,7 +994,8 @@ def get_zone(address, api_key="AIzaSyAzF17u53V310uHFnD0RoCxabjlV0wLYjQ"):
         location = geocode_address_google(address, api_key)
 
         if location:
-            latitude, longitude, city = location
+            # latitude, longitude, city = location
+            latitude, longitude = location
             # print(f"The geocoded coordinates are: Latitude = {latitude}, Longitude = {longitude}")
         else:
             print("Address could not be geocoded.")
