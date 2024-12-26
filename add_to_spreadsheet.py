@@ -299,7 +299,7 @@ def calc_sqft_price(sqft):
 
 def autocalc(sqft, beds, baths, type_clean, name_first, name_last, username, city):
     print(sqft, beds, baths, type_clean, name_first, name_last, username, city)
-    elite = 250
+    elite = 200
     ongoing = 140
     try:
         if type(sqft) != None:
@@ -328,8 +328,8 @@ def autocalc(sqft, beds, baths, type_clean, name_first, name_last, username, cit
                     elite = before_price * initial
                     if ongoing < 140:
                         ongoing = 140
-                if elite < 250:
-                    elite = 250
+                if elite < 200:
+                    elite = 200
 
                 title = get_title(sqft, beds, baths, type_clean, name_last, name_first)
                 main_info = get_quote(month, round(elite), round(ongoing), type_clean, name_first, username, city)
