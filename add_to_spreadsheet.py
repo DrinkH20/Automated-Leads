@@ -404,7 +404,7 @@ We look forward to cleaning for you!
 
 We're grateful for the opportunity to help with your cleaning needs!
 
-Based on the info provided, and a special we are running for {date_month}, your initial reset clean will be ${initial} (this clean will be 2-3x as long and includes washing all interior window panes within arms reach) and weekly service is ${recuring}.
+Based on the info provided, and a special we are running for {date_month}, your initial reset clean will be 50% off at ${initial} (this clean will be 2-3x as long and includes washing all interior window panes within arms reach) and weekly service is {recuring}.
 
 Please let me know if you would like to get on the schedule and if you have any preferred days/times. Our schedule fills up quickly (especially for the longer initial clean!), but we still have a few spots in {date_month}! What works best?
 
@@ -414,7 +414,7 @@ We look forward to cleaning for you!
 
 We're grateful for the opportunity to help with your cleaning needs!
 
-Based on the info provided, and a special we are running for {date_month}, your initial reset clean will be ${initial} (this clean will be 2-3x as long and includes washing all interior window panes within arms reach) and biweekly service is ${recuring}.
+Based on the info provided, and a special we are running for {date_month}, your initial reset clean will be 50% off at ${initial} (this clean will be 2-3x as long and includes washing all interior window panes within arms reach) and biweekly service is {recuring}.
 
 Please let me know if you would like to get on the schedule and if you have any preferred days/times. Our schedule fills up quickly (especially for the longer initial clean!), but we still have a few spots in {date_month}! What works best?
 
@@ -424,7 +424,7 @@ We look forward to cleaning for you!
 
 We're grateful for the opportunity to help with your cleaning needs!
 
-Based on the info provided, and a special we are running for {date_month}, your initial reset clean will be ${initial} (this clean will be 2-3x as long and includes washing all interior window panes within arms reach) and monthly service is ${recuring}.
+Based on the info provided, and a special we are running for {date_month}, your initial reset clean will be 50% off at ${initial} (this clean will be 2-3x as long and includes washing all interior window panes within arms reach) and monthly service is {recuring}.
 
 Please let me know if you would like to get on the schedule and if you have any preferred days/times. Our schedule fills up quickly (especially for the longer initial clean!), but we still have a few spots in {date_month}! What works best?
 
