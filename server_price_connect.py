@@ -5,7 +5,7 @@ from google.oauth2.service_account import Credentials
 
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
 TOKEN_FILE = 'token.pickle'
-CREDENTIALS_FILE = r'vibrant-arcanum-432521-q2-e55244124dd0.json'
+CREDENTIALS_FILE = r'vibrant-arcanum-432521-q2-e55244124dd0 (1).json'
 
 
 def initialize_client():
@@ -15,10 +15,14 @@ def initialize_client():
     return client
 
 
-def update_servers():
+def update_servers(area):
     """Fetches data from the Google Sheet, processes formulas, and returns the calculated values."""
     client = initialize_client()
-    spreadsheet_url = 'https://docs.google.com/spreadsheets/d/1VHiCVG3sYEwoeBHVkWruhEC5n2q5AL3K4SJzpYbj5XA/edit?pli=1&gid=0#gid=0'
+
+    if area == "PDX":
+        spreadsheet_url = 'https://docs.google.com/spreadsheets/d/1VHiCVG3sYEwoeBHVkWruhEC5n2q5AL3K4SJzpYbj5XA/edit?pli=1&gid=0#gid=0'
+    elif area == "DFW":
+        spreadsheet_url = 'https://docs.google.com/spreadsheets/d/1mYiEYwutXg5R3NAD9ymzN8SwSVRmCKtnD4M_gUDzNlQ/edit?gid=1562728204#gid=1562728204'
     gsheet = client.open_by_url(spreadsheet_url)
     sheet = gsheet.worksheet('Estimator')
 
@@ -31,19 +35,33 @@ def update_servers():
         cell = sheet.acell(cell_ref, value_render_option='FORMULA')
         formula.append(cell.value)
 
-    # Regular expression to extract floats and integers from the first part of each formula
     all_floats = []
+    extracted_multipliers = []
+
     for i in formula:
+        # Extract the multiplier right after MAX(...) closes
+        match = re.search(r"\)\*(\d+\.\d+|\d+)", i)
+        if match:
+            extracted_multipliers.append(float(match.group(1)))
+        else:
+            extracted_multipliers.append(None)
+
+        # Extract numeric values from the first part before '+'
         split_point = i.find('+')
-        first_half = i[:split_point]
+        first_half = i[:split_point] if split_point != -1 else i
+
         numbers = re.findall(r'\d+\.\d+|\d+', first_half)
-        numbers.pop(0)  # Remove the first number as per your original logic
-        extracted_numbers = [float(num) if '.' in num else int(num) for num in numbers]
-        all_floats.append(extracted_numbers)
+        if numbers:
+            numbers.pop(0)  # Skip the first number per your original logic
+            extracted_numbers = [float(num) if '.' in num else int(num) for num in numbers]
+            all_floats.append(extracted_numbers)
+        else:
+            all_floats.append([])
 
     # Multiply all the numbers in each sublist
     results = [np.prod(sublist) for sublist in all_floats]
 
     # Convert results to a list of floats
     calc_factors = [float(result) for result in results]
-    return calc_factors
+
+    return calc_factors, extracted_multipliers
