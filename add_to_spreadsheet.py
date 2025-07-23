@@ -52,7 +52,7 @@ def revise_list(data, mark, factor_dfw, dfw_count, pdx_pricing, dfw_pricing):
             "Auto",
             "",
             "emailed",
-            "", "", "",
+            "", "", "", "", "",
             name if name else "",
             service_type if service_type else "",
             zone if zone else "",
@@ -320,8 +320,8 @@ def add_to_spreadsheet(raw_data, mrkt, tx_factors, dfw_amount, pdx_prices, dfw_p
         print(f"Successfully accessed the spreadsheet '{sheet_name}'.")
 
         for item in data:
-            # Ensure each item has exactly 12 columns
-            if len(item) != 16:
+            # Ensure each item has exactly 18 columns
+            if len(item) != 18:
                 print(f"Skipping item with incorrect number of columns: {item}")
                 continue
 
