@@ -11,6 +11,9 @@ from email.mime.text import MIMEText
 import re
 from mapcodes import get_zone
 from add_to_spreadsheet import add_to_spreadsheet
+# ot, initial, move, monthly, biweekly, weekly = 0,0,0,0,0,0
+# market = "PDX"
+# texas_factors, ot, initial, move, monthly, biweekly, weekly = update_prices(market, ot, initial, move, monthly, biweekly, weekly)
 
 app = Flask(__name__)
 
@@ -18,7 +21,7 @@ app = Flask(__name__)
 logging.basicConfig(level=logging.DEBUG)
 
 # Path to your client_secrets.json file which is actually checkmail
-CREDENTIALS_FILE = r'checkemail.json'
+CREDENTIALS_FILE = r'client_secret_1_833814108979-7l6vv2lc6kjit5c1toqpb0sbdq6mtuca.apps.googleusercontent.com (1).json'
 TOKEN_FILE = 'token.pickle'
 
 # Define the Gmail API scope
@@ -30,9 +33,8 @@ if os.path.exists("token.pickle"):
 else:
     print("token.pickle does not exist")
 
-
 def authenticate_gmail():
-    update_prices()
+    # update_prices(market)
     try:
         creds = None
         logging.debug("Starting authentication process.")
@@ -66,33 +68,90 @@ def authenticate_gmail():
         return None
 
 
-def fetch_emails(service, label_id='INBOX'):
+
+# def fetch_emails(service, label_id='INBOX'):
+#     try:
+#         emails = []
+#         page_token = None
+#
+#         while True:
+#             results = service.users().messages().list(userId='me', labelIds=[label_id], pageToken=page_token).execute()
+#             messages = results.get('messages', [])
+#             page_token = results.get('nextPageToken')
+#
+#             for message in messages:
+#                 msg = service.users().messages().get(userId='me', id=message['id']).execute()
+#                 headers = msg['payload']['headers']
+#                 subject = next(header['value'] for header in headers if header['name'] == 'Subject')
+#
+#                 # Extract the body of the email
+#                 body = get_email_body(msg['payload'])
+#
+#                 emails.append({'subject': subject, 'body': body})
+#
+#             if not page_token:
+#                 break  # Exit the loop if there are no more pages
+#
+#         return emails
+#     except Exception as e:
+#         logging.error(f"An error occurred: {e}")
+#         return []
+
+def get_label_ids_by_name(service, label_names):
+    """
+    Returns a dict mapping label name → label ID
+    """
+    results = service.users().labels().list(userId='me').execute()
+    labels = results.get('labels', [])
+
+    label_map = {}
+    for label in labels:
+        if label['name'] in label_names:
+            label_map[label['name']] = label['id']
+    return label_map
+
+def fetch_emails(service, label_id='INBOX', dfw_label_id=None):
     try:
         emails = []
+        dfw_emails = []
         page_token = None
 
         while True:
-            results = service.users().messages().list(userId='me', labelIds=[label_id], pageToken=page_token).execute()
+            results = service.users().messages().list(
+                userId='me',
+                labelIds=[label_id],
+                pageToken=page_token
+            ).execute()
+
             messages = results.get('messages', [])
             page_token = results.get('nextPageToken')
 
             for message in messages:
                 msg = service.users().messages().get(userId='me', id=message['id']).execute()
+                label_ids = msg.get('labelIds', [])
+
+                # Match using label ID, not name
+                if dfw_label_id and dfw_label_id in label_ids:
+                    logging.debug(f"Skipping DFW-labeled email: {message['id']}")
+                    headers = msg['payload'].get('headers', [])
+                    subject = next((h['value'] for h in headers if h['name'] == 'Subject'), "(No Subject)")
+                    body = get_email_body(msg['payload'])
+                    dfw_emails.append({'subject': subject, 'body': body})
+                    continue
+
                 headers = msg['payload']['headers']
                 subject = next(header['value'] for header in headers if header['name'] == 'Subject')
-
-                # Extract the body of the email
                 body = get_email_body(msg['payload'])
-
                 emails.append({'subject': subject, 'body': body})
 
             if not page_token:
-                break  # Exit the loop if there are no more pages
+                break
 
-        return emails
+        return emails, dfw_emails
+
     except Exception as e:
         logging.error(f"An error occurred: {e}")
-        return []
+        return [], []
 
 
 def get_email_body(payload):
@@ -112,6 +171,87 @@ def decode_base64(data):
     return decoded_bytes.decode('UTF-8')
 
 
+# @app.route('/')
+# def index():
+#     creds = authenticate_gmail()
+#     if not creds:
+#         return "Failed to authenticate with Gmail."
+#
+#     service = build('gmail', 'v1', credentials=creds, cache_discovery=False)
+#     logging.debug("Gmail service created successfully.")
+#
+#     label_name = 'LeadsNotYetContacted'
+#     label_id = get_label_id(service, label_name)
+#
+#     if not label_id:
+#         return f"Label '{label_name}' not found."
+#
+#     all_leads = []
+#     check_first = []
+#     lead_emails_for_doubles = []
+#     lead_type_for_doubles = []
+#     # emails = fetch_emails(service, label_id=label_id)
+#     emails, dfw_emails = fetch_emails(service, label_id=label_id)
+#
+#     chart_of_profitable = [
+#         'weekly',
+#         'biweekly',
+#         'monthly',
+#         'move',
+#         'onetime'
+#         'onetime'
+#     ]
+#
+#     for i in emails:
+#         check_first = parse_email_details(get_cleaned_body(i['body']))
+#         last_lead = check_first
+#         try:
+#             state_parts = last_lead[6]
+#             in_zone = int(state_parts[0])
+#             # print(state_parts[1])
+#             try:
+#                 if in_zone > 0 and int(last_lead[4]) > 0:
+#                     if lead_emails_for_doubles.__contains__(last_lead[2]):
+#                         remove_list_item = lead_emails_for_doubles.index(last_lead[2])
+#                         if chart_of_profitable.index(last_lead[1]) < chart_of_profitable.index(
+#                                 lead_type_for_doubles[remove_list_item]):
+#                             # Removes the duplicate
+#                             all_leads.pop(remove_list_item)
+#                             lead_emails_for_doubles.pop(remove_list_item)
+#                             lead_type_for_doubles.pop(remove_list_item)
+#
+#                             # Adds the better lead
+#                             all_leads.append(parse_email_details(get_cleaned_body(i['body'])))
+#                             lead_emails_for_doubles.append(last_lead[2])
+#                             lead_type_for_doubles.append(last_lead[1])
+#                             print("Removed duplicate lead and replaced with better one.")
+#                         else:
+#                             print("Did not add because of better duplicate.")
+#                     else:
+#                         print("added", last_lead[0:2])
+#                         all_leads.append(parse_email_details(get_cleaned_body(i['body'])))
+#                         lead_emails_for_doubles.append(last_lead[2])
+#                         lead_type_for_doubles.append(last_lead[1])
+#             except TypeError:
+#                 print("Not all info")
+#         except ValueError:
+#             print("lead not in zone")
+#
+#     add_to_spreadsheet(all_leads)
+#
+    # html_template = """
+    #     <h1>Latest Emails from {{ label_id }}</h1>
+    #     <ul>
+    #         {% for email in emails %}
+    #             <li>
+    #                 <h3>{{ email.subject }}</h3>
+    #                 <p>{{ email.body }}</p>
+    #             </li>
+    #         {% endfor %}
+    #     </ul>
+    #     """
+    #
+    # return render_template_string(html_template, emails=emails, label_id=label_id)
 @app.route('/')
 def index():
     creds = authenticate_gmail()
@@ -123,61 +263,115 @@ def index():
 
     label_name = 'LeadsNotYetContacted'
     label_id = get_label_id(service, label_name)
+    label_names_needed = ['LeadsNotYetContacted', 'DFW']
+    label_ids = get_label_ids_by_name(service, label_names_needed)
+
+    lead_label_id = label_ids.get('LeadsNotYetContacted')
+    dfw_label_id = label_ids.get('DFW')
 
     if not label_id:
         return f"Label '{label_name}' not found."
 
     all_leads = []
-    check_first = []
     lead_emails_for_doubles = []
     lead_type_for_doubles = []
-    emails = fetch_emails(service, label_id=label_id)
 
-    chart_of_profitable = [
-        'weekly',
-        'biweekly',
-        'monthly',
-        'move',
-        'onetime'
-        'onetime'
-    ]
+    # emails, dfw_emails = fetch_emails(service, label_id=label_id)
+    emails, dfw_emails = fetch_emails(service, label_id=lead_label_id, dfw_label_id=dfw_label_id)
 
+    chart_of_profitable = ['weekly', 'biweekly', 'monthly', 'move', 'onetime']
+    ot = initial = move = monthly = biweekly = weekly = 0
+    market = "PDX"
+    texas_factors, ot, initial, move, monthly, biweekly, weekly = update_prices(market, ot, initial, move, monthly,
+                                                                                biweekly, weekly)
+    pricing_pdx = {
+        'ot': ot,
+        'initial': initial,
+        'move': move,
+        'monthly': monthly,
+        'biweekly': biweekly,
+        'weekly': weekly
+    }
+    # --- Process PDX emails first ---
     for i in emails:
-        check_first = parse_email_details(get_cleaned_body(i['body']))
+        if 'body' not in i:
+            continue
+        check_first = parse_email_details(get_cleaned_body(i['body']), market)
         last_lead = check_first
         try:
             state_parts = last_lead[6]
             in_zone = int(state_parts[0])
-            # print(state_parts[1])
-            try:
-                if in_zone > 0 and int(last_lead[4]) > 0:
-                    if lead_emails_for_doubles.__contains__(last_lead[2]):
-                        remove_list_item = lead_emails_for_doubles.index(last_lead[2])
-                        if chart_of_profitable.index(last_lead[1]) < chart_of_profitable.index(
-                                lead_type_for_doubles[remove_list_item]):
-                            # Removes the duplicate
-                            all_leads.pop(remove_list_item)
-                            lead_emails_for_doubles.pop(remove_list_item)
-                            lead_type_for_doubles.pop(remove_list_item)
+            if in_zone > 0 and int(last_lead[4]) > 0:
+                if last_lead[2] in lead_emails_for_doubles:
+                    idx = lead_emails_for_doubles.index(last_lead[2])
+                    if chart_of_profitable.index(last_lead[1]) < chart_of_profitable.index(lead_type_for_doubles[idx]):
+                        all_leads.pop(idx)
+                        lead_emails_for_doubles.pop(idx)
+                        lead_type_for_doubles.pop(idx)
 
-                            # Adds the better lead
-                            all_leads.append(parse_email_details(get_cleaned_body(i['body'])))
-                            lead_emails_for_doubles.append(last_lead[2])
-                            lead_type_for_doubles.append(last_lead[1])
-                            print("Removed duplicate lead and replaced with better one.")
-                        else:
-                            print("Did not add because of better duplicate.")
-                    else:
-                        print("added", last_lead[0:2])
-                        all_leads.append(parse_email_details(get_cleaned_body(i['body'])))
+                        all_leads.append(check_first)
                         lead_emails_for_doubles.append(last_lead[2])
                         lead_type_for_doubles.append(last_lead[1])
-            except TypeError:
-                print("Not all info")
-        except ValueError:
-            print("lead not in zone")
+                        print("Removed duplicate lead and replaced with better one.")
+                    else:
+                        print("Did not add because of better duplicate.")
+                else:
+                    print("added", last_lead[0:2])
+                    all_leads.append(check_first)
+                    lead_emails_for_doubles.append(last_lead[2])
+                    lead_type_for_doubles.append(last_lead[1])
+        except (TypeError, ValueError):
+            print("Skipped due to invalid zone or lead info.")
 
-    add_to_spreadsheet(all_leads)
+    # --- Now process DFW emails separately ---
+    market = "DFW"
+    texas_factors, ot, initial, move, monthly, biweekly, weekly = update_prices(market, ot, initial, move, monthly,
+                                                                                biweekly, weekly)
+    pricing_dfw = {
+        'ot': ot,
+        'initial': initial,
+        'move': move,
+        'monthly': monthly,
+        'biweekly': biweekly,
+        'weekly': weekly
+    }
+
+    before_dfw_len = len(all_leads)
+    for i in dfw_emails:
+        if 'body' not in i:
+            continue
+        check_first = parse_email_details(get_cleaned_body(i['body']), market)
+        last_lead = check_first
+        try:
+            state_parts = last_lead[6]
+            in_zone = int(state_parts[0])
+            if in_zone > 0 and int(last_lead[4]) > 0:
+                if last_lead[2] in lead_emails_for_doubles:
+                    idx = lead_emails_for_doubles.index(last_lead[2])
+                    if chart_of_profitable.index(last_lead[1]) < chart_of_profitable.index(lead_type_for_doubles[idx]):
+                        all_leads.pop(idx)
+                        lead_emails_for_doubles.pop(idx)
+                        lead_type_for_doubles.pop(idx)
+
+                        all_leads.append(check_first)
+                        lead_emails_for_doubles.append(last_lead[2])
+                        lead_type_for_doubles.append(last_lead[1])
+                        print("Removed duplicate lead and replaced with better one (DFW).")
+                    else:
+                        print("Did not add (DFW) due to better duplicate.")
+                else:
+                    print("added (DFW)", last_lead[0:2])
+                    all_leads.append(check_first)
+                    lead_emails_for_doubles.append(last_lead[2])
+                    lead_type_for_doubles.append(last_lead[1])
+        except (TypeError, ValueError):
+            print("Skipped (DFW) due to invalid zone or lead info.")
+
+    # Final push to spreadsheet
+    print("before add spreadsheet", market)
+    after_dfw_len = len(all_leads)
+    total_dfw_leads = after_dfw_len - before_dfw_len
+    add_to_spreadsheet(all_leads, market, texas_factors, total_dfw_leads, pricing_pdx, pricing_dfw)
 
     html_template = """
         <h1>Latest Emails from {{ label_id }}</h1>
@@ -194,7 +388,7 @@ def index():
     return render_template_string(html_template, emails=emails, label_id=label_id)
 
 
-def parse_email_details(text):
+def parse_email_details(text, mark):
     # Extract name and type of service after the word "wants"
 
     name_type_match = re.search(
@@ -252,11 +446,11 @@ def parse_email_details(text):
         if match:
             # Check if the captured value contains a <br> and strip it off if present
             utm_value = match.group(1).split('<br>')[0].strip()
-            print("got one", utm_value)
+            # print("got one", utm_value)
             if utm_value != "":
                 break
 
-    return name, service_type, email, sqft, bed, bath, get_zone(address), phone, utm_value
+    return name, service_type, email, sqft, bed, bath, get_zone(address, mark), phone, utm_value
     # return name, service_type, email, sqft, bed, bath, get_zone(address), utm_value
 
 
@@ -293,4 +487,4 @@ def get_label_id(service, label_name):
 
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, port=5100)

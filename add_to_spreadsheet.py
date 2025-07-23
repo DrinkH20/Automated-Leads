@@ -16,20 +16,25 @@ import html
 import re
 from server_price_connect import update_servers
 
+# ot, initial, move, monthly, biweekly, weekly = 0,0,0,0,0,0
+
 
 SCOPES = ['https://www.googleapis.com/auth/gmail.readonly', 'https://www.googleapis.com/auth/gmail.compose']
 
-CREDENTIALS_FILE = r'checkemail.json'
+CREDENTIALS_FILE = r'checkmail.json'
 TOKEN_FILE = 'token.pickle'
+
 
 logging.basicConfig(level=logging.DEBUG)
 
 
-def revise_list(data):
+def revise_list(data, mark, factor_dfw, dfw_count, pdx_pricing, dfw_pricing):
+    print("this is the revised", mark)
 
     revised_data = []
     today_date = datetime.now().strftime('%#m/%#d')  # Get today's date in M/D format
-
+    draft_list = []
+    count = 0
     for item in data:
         # Extract each element from the tuple
         state_place = item[6]
@@ -61,13 +66,25 @@ def revise_list(data):
         if ',' in name:
             last_name, first_name = name.split(',', 1)
         print(service_type.upper(), scripts_choose.index(service_type.upper()))
-        sub, body_text = autocalc(sqft, bed, bath, scripts_choose.index(service_type.upper()), first_name, last_name, "Joel", city)
-        create_draft_route(sub, body_text, email)
-        print("create_draft")
+        if (len(data) - count) > dfw_count:
+            sub, body_text = autocalc(sqft, bed, bath, scripts_choose.index(service_type.upper()), first_name, last_name, "Joel", city, "PDX", factor_dfw, pdx_pricing)
+        else:
+            sub, body_text = autocalc(sqft, bed, bath, scripts_choose.index(service_type.upper()), first_name,
+                                      last_name, "Joel", city, "DFW", factor_dfw, dfw_pricing)
+        draft_list.append((sub, body_text, email))
+        count += 1
+        # create_draft_route(sub, body_text, email, mark)
+        # print("create_draft")
+    # Send drafts, labeling the last dfw_amount as DFW
+    total = len(draft_list)
+    for i, (sub, body_text, email) in enumerate(draft_list):
+        is_dfw = i >= total - dfw_count
+        label_market = "DFW" if is_dfw else "PDX"
+        create_draft_route(sub, body_text, email, label_market)
     return revised_data
 
 
-def create_label_if_not_exists(service, user_id, label_name):
+def create_label_if_not_exists(service, user_id, label_name, markt=None):
     """Creates a new label if it doesn't exist."""
     try:
         # List existing labels
@@ -121,59 +138,117 @@ def convert_text_to_html(message_text):
     return html_message
 
 
-def create_draft(service, sender_name, sender, subject, message_text, receiver, label_name='Leads In Process'):
+# def create_draft(service, sender_name, sender, subject, message_text, receiver, area, label_name='Leads In Process'):
+#     try:
+#         print(area, "sjhdf this one")
+#         # Create the message
+#         message = MIMEMultipart('alternative')
+#         formatted_sender = formataddr((sender_name, sender))
+#
+#         html_message = convert_text_to_html(message_text) + "<br><br>— Clean Affinity"
+#         plain_text = message_text + "\n\n— Clean Affinity"
+#
+#         message.attach(MIMEText(plain_text, 'plain'))
+#         message.attach(MIMEText(html_message, 'html'))
+#
+#         message['to'] = receiver
+#         message['from'] = "hello@cleanaffinity.com"
+#         message['subject'] = subject
+#
+#         raw = base64.urlsafe_b64encode(message.as_bytes()).decode()
+#
+#         draft_body = {'message': {'raw': raw}}
+#         draft = service.users().drafts().create(userId='me', body=draft_body).execute()
+#         logging.debug(f"Draft created with ID: {draft['id']}")
+#
+#         # Get the message ID
+#         message_id = draft['message']['id']
+#
+#         # Ensure both labels exist
+#         label_ids = []
+#         in_process_id = create_label_if_not_exists(service, 'me', label_name, area)
+#         if in_process_id:
+#             label_ids.append(in_process_id)
+#
+#         if area.upper() == "DFW":
+#             dfw_id = create_label_if_not_exists(service, 'me', "DFW", area)
+#             if dfw_id:
+#                 label_ids.append(dfw_id)
+#
+#         # Apply labels
+#         if label_ids:
+#             apply_label_to_message(service, 'me', message_id, label_ids[0])  # Always apply at least one
+#             for label_id in label_ids[1:]:
+#                 apply_label_to_message(service, 'me', message_id, label_id)
+#
+#         return draft
+#
+#     except Exception as e:
+#         logging.error(f"An error occurred while creating a draft: {e}")
+#         return None
+def create_draft(service, sender_name, sender, subject, message_text, receiver, area, label_name='Leads In Process'):
     try:
-        # Create a multipart message to support both plain text and HTML content
+        print(area, "sjhdf this one")
+
         message = MIMEMultipart('alternative')
         formatted_sender = formataddr((sender_name, sender))
 
-        # Define the footer with your logo and other HTML elements
-        footer_html = """
-        <div dir="ltr"><img data-aii="CiExZnhMN2ttWDdra2RHdlY5Z1U4ODhUTHdlZEpVSEYwbTU" src="https://ci3.googleusercontent.com/mail-sig/AIorK4wK5N0Ul0HHETT-MTvAGX0Ry6a3go9OyEQWmOp7woQXvjOF0DXhwxdbLs-viIsdHmS9hkuL_CG6fN7M" data-os="https://lh3.googleusercontent.com/d/1fxL7kmX7kkdGvV9gU888TLwedJUHF0m5"><br><table cellpadding="0" cellspacing="0" style="color:rgb(255,255,255);font-size:medium;vertical-align:-webkit-baseline-middle;font-family:Arial"><tbody><tr><td><table cellpadding="0" cellspacing="0" style="vertical-align:-webkit-baseline-middle;font-family:Arial"><tbody><tr><td style="vertical-align:top"><table cellpadding="0" cellspacing="0" style="vertical-align:-webkit-baseline-middle;font-family:Arial"><tbody><tr><td style="text-align:center"></td></tr><tr><td height="30"></td></tr><tr><td style="text-align:center"><table cellpadding="0" cellspacing="0" style="vertical-align:-webkit-baseline-middle;font-family:Arial;display:inline-block"><tbody><tr><td><a href="https://www.facebook.com/cleanaffinity/" color="#3fcdd2" style="display:inline-block;padding:0px;background-color:rgb(63,205,210)" target="_blank"><img height="24" src="https://cdn2.hubspot.net/hubfs/53/tools/email-signature-generator/icons/facebook-icon-2x.png" alt="facebook" color="#3fcdd2" style="max-width:135px;display:block"></a></td><td width="5"><div></div></td><td><a href="https://twitter.com/clean_affinity" color="#3fcdd2" style="display:inline-block;padding:0px;background-color:rgb(63,205,210)" target="_blank"><img height="24" src="https://cdn2.hubspot.net/hubfs/53/tools/email-signature-generator/icons/twitter-icon-2x.png" alt="twitter" color="#3fcdd2" style="max-width:135px;display:block"></a></td><td width="5"><div></div></td><td><a href="https://www.linkedin.com/company/cleanaffinity" color="#3fcdd2" style="display:inline-block;padding:0px;background-color:rgb(63,205,210)" target="_blank"><img height="24" src="https://cdn2.hubspot.net/hubfs/53/tools/email-signature-generator/icons/linkedin-icon-2x.png" alt="linkedin" color="#3fcdd2" style="max-width:135px;display:block"></a></td><td width="5"><div></div></td><td><a href="https://instagram.com/cleanaffinity" color="#3fcdd2" style="display:inline-block;padding:0px;background-color:rgb(63,205,210)" target="_blank"><img height="24" src="https://cdn2.hubspot.net/hubfs/53/tools/email-signature-generator/icons/instagram-icon-2x.png" alt="instagram" color="#3fcdd2" style="max-width:135px;display:block"></a></td><td width="5"><div></div></td></tr></tbody></table></td></tr></tbody></table></td><td width="46"><div></div></td><td style="padding:0px;vertical-align:middle"><h3 color="#000000" style="margin:0px;font-size:18px;color:rgb(0,0,0)">Office Team</h3><p color="#000000" style="margin:0px;color:rgb(0,0,0);font-size:14px;line-height:22px">Clean Affinity</p><table cellpadding="0" cellspacing="0" style="vertical-align:-webkit-baseline-middle;font-family:Arial;width:234px"><tbody><tr><td height="30"></td></tr><tr><td height="1" color="#3FCDD2" style="width:234px;border-bottom:1px solid rgb(63,205,210);border-left:none;display:block"></td></tr><tr><td height="30"></td></tr></tbody></table><table cellpadding="0" cellspacing="0" style="vertical-align:-webkit-baseline-middle;font-family:Arial"><tbody><tr height="25" style="vertical-align:middle"><td width="30" style="vertical-align:middle"><table cellpadding="0" cellspacing="0" style="vertical-align:-webkit-baseline-middle;font-family:Arial"><tbody><tr><td style="vertical-align:bottom"><span width="11" color="#3FCDD2" style="display:block;background-color:rgb(63,205,210)"><img width="13" src="https://cdn2.hubspot.net/hubfs/53/tools/email-signature-generator/icons/phone-icon-2x.png" color="#3FCDD2" style="display:block"></span></td></tr></tbody></table></td><td style="padding:0px;color:rgb(0,0,0)"><a href="tel:503-933-1917" color="#000000" style="color:rgb(0,0,0);font-size:12px" target="_blank">503-933-1917</a></td></tr><tr height="25" style="vertical-align:middle"><td width="30" style="vertical-align:middle"><table cellpadding="0" cellspacing="0" style="vertical-align:-webkit-baseline-middle;font-family:Arial"><tbody><tr><td style="vertical-align:bottom"><span width="11" color="#3FCDD2" style="display:block;background-color:rgb(63,205,210)"><img width="13" src="https://cdn2.hubspot.net/hubfs/53/tools/email-signature-generator/icons/email-icon-2x.png" color="#3FCDD2" style="display:block"></span></td></tr></tbody></table></td><td style="padding:0px"><a href="mailto:hello@cleanaffinity.com" color="#000000" style="color:rgb(0,0,0);font-size:12px" target="_blank">hello@cleanaffinity.com</a></td></tr><tr height="25" style="vertical-align:middle"><td width="30" style="vertical-align:middle"><table cellpadding="0" cellspacing="0" style="vertical-align:-webkit-baseline-middle;font-family:Arial"><tbody><tr><td style="vertical-align:bottom"><span width="11" color="#3FCDD2" style="display:block;background-color:rgb(63,205,210)"><img width="13" src="https://cdn2.hubspot.net/hubfs/53/tools/email-signature-generator/icons/link-icon-2x.png" color="#3FCDD2" style="display:block"></span></td></tr></tbody></table></td><td style="padding:0px"><a href="https://www.cleanaffinity.com/" color="#000000" style="color:rgb(0,0,0);font-size:12px" target="_blank">www.cleanaffinity.com</a></td></tr><tr height="25" style="vertical-align:middle"><td width="30" style="vertical-align:middle"><br></td><td style="padding:0px"><br></td></tr></tbody></table></td></tr></tbody></table></td></tr><tr><td></td></tr></tbody></table><table cellpadding="0" cellspacing="0" style="color:rgb(255,255,255);font-size:medium;vertical-align:-webkit-baseline-middle;font-family:Arial"><tbody><tr><td><table cellpadding="0" cellspacing="0" style="vertical-align:-webkit-baseline-middle;font-family:Arial"><tbody><tr><td style="vertical-align:top"></td><td width="46"></td><td style="padding:0px;vertical-align:middle"><table cellpadding="0" cellspacing="0" style="vertical-align:-webkit-baseline-middle;font-family:Arial"><tbody><tr><td height="30"></td></tr></tbody></table></td></tr></tbody></table></td></tr></tbody></table></div>
-                """
+        # Signature footer HTML
+        # footer_html = """
+        #         <div dir="ltr"><img data-aii="CiExZnhMN2ttWDdra2RHdlY5Z1U4ODhUTHdlZEpVSEYwbTU" src="https://ci3.googleusercontent.com/mail-sig/AIorK4wK5N0Ul0HHETT-MTvAGX0Ry6a3go9OyEQWmOp7woQXvjOF0DXhwxdbLs-viIsdHmS9hkuL_CG6fN7M" data-os="https://lh3.googleusercontent.com/d/1fxL7kmX7kkdGvV9gU888TLwedJUHF0m5"><br><table cellpadding="0" cellspacing="0" style="color:rgb(255,255,255);font-size:medium;vertical-align:-webkit-baseline-middle;font-family:Arial"><tbody><tr><td><table cellpadding="0" cellspacing="0" style="vertical-align:-webkit-baseline-middle;font-family:Arial"><tbody><tr><td style="vertical-align:top"><table cellpadding="0" cellspacing="0" style="vertical-align:-webkit-baseline-middle;font-family:Arial"><tbody><tr><td style="text-align:center"></td></tr><tr><td height="30"></td></tr><tr><td style="text-align:center"><table cellpadding="0" cellspacing="0" style="vertical-align:-webkit-baseline-middle;font-family:Arial;display:inline-block"><tbody><tr><td><a href="https://www.facebook.com/cleanaffinity/" color="#3fcdd2" style="display:inline-block;padding:0px;background-color:rgb(63,205,210)" target="_blank"><img height="24" src="https://cdn2.hubspot.net/hubfs/53/tools/email-signature-generator/icons/facebook-icon-2x.png" alt="facebook" color="#3fcdd2" style="max-width:135px;display:block"></a></td><td width="5"><div></div></td><td><a href="https://twitter.com/clean_affinity" color="#3fcdd2" style="display:inline-block;padding:0px;background-color:rgb(63,205,210)" target="_blank"><img height="24" src="https://cdn2.hubspot.net/hubfs/53/tools/email-signature-generator/icons/twitter-icon-2x.png" alt="twitter" color="#3fcdd2" style="max-width:135px;display:block"></a></td><td width="5"><div></div></td><td><a href="https://www.linkedin.com/company/cleanaffinity" color="#3fcdd2" style="display:inline-block;padding:0px;background-color:rgb(63,205,210)" target="_blank"><img height="24" src="https://cdn2.hubspot.net/hubfs/53/tools/email-signature-generator/icons/linkedin-icon-2x.png" alt="linkedin" color="#3fcdd2" style="max-width:135px;display:block"></a></td><td width="5"><div></div></td><td><a href="https://instagram.com/cleanaffinity" color="#3fcdd2" style="display:inline-block;padding:0px;background-color:rgb(63,205,210)" target="_blank"><img height="24" src="https://cdn2.hubspot.net/hubfs/53/tools/email-signature-generator/icons/instagram-icon-2x.png" alt="instagram" color="#3fcdd2" style="max-width:135px;display:block"></a></td><td width="5"><div></div></td></tr></tbody></table></td></tr></tbody></table></td><td width="46"><div></div></td><td style="padding:0px;vertical-align:middle"><h3 color="#000000" style="margin:0px;font-size:18px;color:rgb(0,0,0)">Office Team</h3><p color="#000000" style="margin:0px;color:rgb(0,0,0);font-size:14px;line-height:22px">Clean Affinity</p><table cellpadding="0" cellspacing="0" style="vertical-align:-webkit-baseline-middle;font-family:Arial;width:234px"><tbody><tr><td height="30"></td></tr><tr><td height="1" color="#3FCDD2" style="width:234px;border-bottom:1px solid rgb(63,205,210);border-left:none;display:block"></td></tr><tr><td height="30"></td></tr></tbody></table><table cellpadding="0" cellspacing="0" style="vertical-align:-webkit-baseline-middle;font-family:Arial"><tbody><tr height="25" style="vertical-align:middle"><td width="30" style="vertical-align:middle"><table cellpadding="0" cellspacing="0" style="vertical-align:-webkit-baseline-middle;font-family:Arial"><tbody><tr><td style="vertical-align:bottom"><span width="11" color="#3FCDD2" style="display:block;background-color:rgb(63,205,210)"><img width="13" src="https://cdn2.hubspot.net/hubfs/53/tools/email-signature-generator/icons/phone-icon-2x.png" color="#3FCDD2" style="display:block"></span></td></tr></tbody></table></td><td style="padding:0px;color:rgb(0,0,0)"><a href="tel:503-933-1917" color="#000000" style="color:rgb(0,0,0);font-size:12px" target="_blank">503-933-1917</a></td></tr><tr height="25" style="vertical-align:middle"><td width="30" style="vertical-align:middle"><table cellpadding="0" cellspacing="0" style="vertical-align:-webkit-baseline-middle;font-family:Arial"><tbody><tr><td style="vertical-align:bottom"><span width="11" color="#3FCDD2" style="display:block;background-color:rgb(63,205,210)"><img width="13" src="https://cdn2.hubspot.net/hubfs/53/tools/email-signature-generator/icons/email-icon-2x.png" color="#3FCDD2" style="display:block"></span></td></tr></tbody></table></td><td style="padding:0px"><a href="mailto:hello@cleanaffinity.com" color="#000000" style="color:rgb(0,0,0);font-size:12px" target="_blank">hello@cleanaffinity.com</a></td></tr><tr height="25" style="vertical-align:middle"><td width="30" style="vertical-align:middle"><table cellpadding="0" cellspacing="0" style="vertical-align:-webkit-baseline-middle;font-family:Arial"><tbody><tr><td style="vertical-align:bottom"><span width="11" color="#3FCDD2" style="display:block;background-color:rgb(63,205,210)"><img width="13" src="https://cdn2.hubspot.net/hubfs/53/tools/email-signature-generator/icons/link-icon-2x.png" color="#3FCDD2" style="display:block"></span></td></tr></tbody></table></td><td style="padding:0px"><a href="https://www.cleanaffinity.com/" color="#000000" style="color:rgb(0,0,0);font-size:12px" target="_blank">www.cleanaffinity.com</a></td></tr><tr height="25" style="vertical-align:middle"><td width="30" style="vertical-align:middle"><br></td><td style="padding:0px"><br></td></tr></tbody></table></td></tr></tbody></table></td></tr><tr><td></td></tr></tbody></table><table cellpadding="0" cellspacing="0" style="color:rgb(255,255,255);font-size:medium;vertical-align:-webkit-baseline-middle;font-family:Arial"><tbody><tr><td><table cellpadding="0" cellspacing="0" style="vertical-align:-webkit-baseline-middle;font-family:Arial"><tbody><tr><td style="vertical-align:top"></td><td width="46"></td><td style="padding:0px;vertical-align:middle"><table cellpadding="0" cellspacing="0" style="vertical-align:-webkit-baseline-middle;font-family:Arial"><tbody><tr><td height="30"></td></tr></tbody></table></td></tr></tbody></table></td></tr></tbody></table></div>
+        #                 """
+        if area.upper() != "DFW":
+            footer_html = """
+            <table width="206" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;border-spacing:0px;color:rgb(20,49,65);font-family:proxima-nova,sans-serif;font-size:16px"><tbody><tr><td style="margin:auto;padding:0px 0px 1px"><a href="https://cleanaffinity.com/" style="background-color:transparent;color:rgb(35,82,124);outline:0px;display:inline-block" target="_blank" data-saferedirecturl="https://www.google.com/url?q=https://cleanaffinity.com/&amp;source=gmail&amp;ust=1753387360204000&amp;usg=AOvVaw1_qGxFX9vNvZj88nCJmRhf"><img width="200" src="https://ci3.googleusercontent.com/meips/ADKq_NaHCjqRyVIbvhTlEb3vGPvT6jjSyDbNyBJE7ZhgTdaYGWQ2Ux1vTrGvxNSFWCoI_7YLbi2lyvNToByk2wku5X4Ty3j2kGBnqDThP-lz5meLf3ComXVwEg=s0-d-e1-ft#https://s1g.s3.amazonaws.com/325e6b8720f2f9a00d074326edf01a9f.png" style="border:none;vertical-align:baseline" class="CToWUd" data-bit="iit"></a></td></tr><tr><td height="4" style="padding:0px;border-top:3px solid rgb(0,0,0)"></td></tr><tr><td style="padding:0px;vertical-align:middle;color:rgb(0,0,0);font-size:12px;font-family:helvetica,arial"><span style="font-weight:700"><span style="font-size:15px">Office Team</span></span><br><br><table cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;border-spacing:0px;background-color:transparent;margin:0px 1px 1px 0px"><tbody><tr><td style="padding:0px 1px 0px 0px"><img width="33" height="33" src="https://ci3.googleusercontent.com/meips/ADKq_Nbu8BcqvPO0NsMt0thKm1fy5BM-bke3tekFIPLPj8-lOIllqWmOXD_sNYvqyTuFPb8NZLkVMMT1KtHKvYpfxBq-1Rs_P3kVVbF3j3_umEaigthjxIeBBg=s0-d-e1-ft#https://s1g.s3.amazonaws.com/3e17acc3e1f17ca0eb066f92112030d4.png" alt="email" style="border:none;vertical-align:baseline" class="CToWUd" data-bit="iit"></td><td style="padding:0px"><span style="font-size-adjust:none;font-stretch:normal;line-height:normal"><a href="mailto:hello@cleanaffinity.com" style="background-color:transparent;color:rgb(0,0,0)" target="_blank">hello@cleanaffinity.com</a></span></td></tr></tbody></table><table cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;border-spacing:0px;background-color:transparent;margin:0px 1px 1px 0px"><tbody><tr><td style="padding:0px 1px 0px 0px"><img width="33" height="33" src="https://ci3.googleusercontent.com/meips/ADKq_NbOvxEt5lgrvY7In4555tR498ZHVnamfeiNDuz0ihljVAOsV1JEkU7A8huN48KtfFD-RaiqMdvdbpefi2ElxhXdGOXBcb5OIoj2c5IudggNYU8JcBIWxA=s0-d-e1-ft#https://s1g.s3.amazonaws.com/6d17a9904ea926bfe5700c3e877f70c0.png" alt="mobile" style="border:none;vertical-align:baseline" class="CToWUd" data-bit="iit"></td><td style="padding:0px"><span style="font-size-adjust:none;font-stretch:normal;line-height:normal"><a href="tel:503-933-1917" target="_blank">503-933-1917</a></span></td></tr></tbody></table><table cellpadding="0" border="0" style="border-collapse:collapse;border-spacing:0px;background-color:transparent"><tbody><tr><td style="padding:0px 5px 0px 0px"><a href="https://facebook.com/cleanaffinity/" style="background-color:transparent;color:rgb(51,122,183);display:inline-block" target="_blank" data-saferedirecturl="https://www.google.com/url?q=https://facebook.com/cleanaffinity/&amp;source=gmail&amp;ust=1753387360204000&amp;usg=AOvVaw1PokiaSIca2gSp9_r74Pu2"><img width="33" height="33" src="https://ci3.googleusercontent.com/meips/ADKq_NarBJHUDBNpZSF5x9fwZRDVzxrCJQ0OjwhhH5kt5Prfkk-Ae1pCwBmyRD2fyPtAklyAZDBnTH8kUNq8b1zU9cy_YXAjjV7JVzc_0XoliAgiyxNqz8x5gw=s0-d-e1-ft#https://s1g.s3.amazonaws.com/2c5fe92c2cad30bc7beafa503141662b.png" alt="Facebook" style="border:none;vertical-align:baseline" class="CToWUd" data-bit="iit"></a></td><td style="padding:0px 5px 0px 0px"><a href="https://instagram.com/cleanaffinity/" style="background-color:transparent;color:rgb(51,122,183);display:inline-block" target="_blank" data-saferedirecturl="https://www.google.com/url?q=https://instagram.com/cleanaffinity/&amp;source=gmail&amp;ust=1753387360204000&amp;usg=AOvVaw16I4Z5Yx74Y6W15ySxm9yJ"><img width="33" height="33" src="https://ci3.googleusercontent.com/meips/ADKq_NZxAdIU3eRhJqF8PfQpL0gZAj4ovvZCNNIY4aDVSWm4yfk_nW9A5s6Dt3oi9y4mthvIgZViU5HaXEcUUK6Vx8sClYSC_nYEEwuRmnXan-ZJzjuWbkKNkw=s0-d-e1-ft#https://s1g.s3.amazonaws.com/85231364dae3871f3e2465f0e3e47239.png" alt="Instagram" style="border:none;vertical-align:baseline" class="CToWUd" data-bit="iit"></a></td></tr></tbody></table><a href="https://cleanaffinity.com/" style="background-color:transparent;color:rgb(0,0,0)" target="_blank" data-saferedirecturl="https://www.google.com/url?q=https://cleanaffinity.com/&amp;source=gmail&amp;ust=1753387360204000&amp;usg=AOvVaw1_qGxFX9vNvZj88nCJmRhf">cleanaffinity.com/</a><br></td></tr></tbody></table>
+            """
+        else:
+            footer_html = """
+            <table width="206" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;border-spacing:0px;color:rgb(20,49,65);font-family:proxima-nova,sans-serif;font-size:16px"><tbody><tr><td style="margin:auto;padding:0px 0px 1px"><a href="https://cleanaffinity.com/" style="background-color:transparent;color:rgb(35,82,124);outline:0px;display:inline-block" target="_blank" data-saferedirecturl="https://www.google.com/url?q=https://cleanaffinity.com/&amp;source=gmail&amp;ust=1753390838452000&amp;usg=AOvVaw1Jdh4ThRFl97qfd7jNlOSq"><img width="200" src="https://ci3.googleusercontent.com/meips/ADKq_NaHCjqRyVIbvhTlEb3vGPvT6jjSyDbNyBJE7ZhgTdaYGWQ2Ux1vTrGvxNSFWCoI_7YLbi2lyvNToByk2wku5X4Ty3j2kGBnqDThP-lz5meLf3ComXVwEg=s0-d-e1-ft#https://s1g.s3.amazonaws.com/325e6b8720f2f9a00d074326edf01a9f.png" style="border:none;vertical-align:baseline" class="CToWUd" data-bit="iit"></a></td></tr><tr><td height="4" style="padding:0px;border-top:3px solid rgb(0,0,0)"></td></tr><tr><td style="padding:0px;vertical-align:middle;color:rgb(0,0,0);font-size:12px;font-family:helvetica,arial"><span style="font-weight:700"><span style="font-size:15px">Office Team</span></span><br><br><table cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;border-spacing:0px;background-color:transparent;margin:0px 1px 1px 0px"><tbody><tr><td style="padding:0px 1px 0px 0px"><img width="33" height="33" src="https://ci3.googleusercontent.com/meips/ADKq_Nbu8BcqvPO0NsMt0thKm1fy5BM-bke3tekFIPLPj8-lOIllqWmOXD_sNYvqyTuFPb8NZLkVMMT1KtHKvYpfxBq-1Rs_P3kVVbF3j3_umEaigthjxIeBBg=s0-d-e1-ft#https://s1g.s3.amazonaws.com/3e17acc3e1f17ca0eb066f92112030d4.png" alt="email" style="border:none;vertical-align:baseline" class="CToWUd" data-bit="iit"></td><td style="padding:0px"><span style="font-size-adjust:none;font-stretch:normal;line-height:normal"><a href="mailto:hellodfw@cleanaffinity.com" style="background-color:transparent;color:rgb(0,0,0)" target="_blank">hellodfw@cleanaffinity.com</a></span></td></tr></tbody></table><table cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;border-spacing:0px;background-color:transparent;margin:0px 1px 1px 0px"><tbody><tr><td style="padding:0px 1px 0px 0px"><img width="33" height="33" src="https://ci3.googleusercontent.com/meips/ADKq_NbOvxEt5lgrvY7In4555tR498ZHVnamfeiNDuz0ihljVAOsV1JEkU7A8huN48KtfFD-RaiqMdvdbpefi2ElxhXdGOXBcb5OIoj2c5IudggNYU8JcBIWxA=s0-d-e1-ft#https://s1g.s3.amazonaws.com/6d17a9904ea926bfe5700c3e877f70c0.png" alt="mobile" style="border:none;vertical-align:baseline" class="CToWUd" data-bit="iit"></td><td style="padding:0px"><span style="font-size-adjust:none;font-stretch:normal;line-height:normal"><a href="tel:972-318-4678" target="_blank">972-318-4678</a></span></td></tr></tbody></table><table cellpadding="0" border="0" style="border-collapse:collapse;border-spacing:0px;background-color:transparent"><tbody><tr><td style="padding:0px 5px 0px 0px"><a href="https://facebook.com/cleanaffinity/" style="background-color:transparent;color:rgb(51,122,183);display:inline-block" target="_blank" data-saferedirecturl="https://www.google.com/url?q=https://facebook.com/cleanaffinity/&amp;source=gmail&amp;ust=1753390838453000&amp;usg=AOvVaw3nrk9R9LBXsHPIEY36yHhu"><img width="33" height="33" src="https://ci3.googleusercontent.com/meips/ADKq_NarBJHUDBNpZSF5x9fwZRDVzxrCJQ0OjwhhH5kt5Prfkk-Ae1pCwBmyRD2fyPtAklyAZDBnTH8kUNq8b1zU9cy_YXAjjV7JVzc_0XoliAgiyxNqz8x5gw=s0-d-e1-ft#https://s1g.s3.amazonaws.com/2c5fe92c2cad30bc7beafa503141662b.png" alt="Facebook" style="border:none;vertical-align:baseline" class="CToWUd" data-bit="iit"></a></td><td style="padding:0px 5px 0px 0px"><a href="https://instagram.com/cleanaffinity/" style="background-color:transparent;color:rgb(51,122,183);display:inline-block" target="_blank" data-saferedirecturl="https://www.google.com/url?q=https://instagram.com/cleanaffinity/&amp;source=gmail&amp;ust=1753390838453000&amp;usg=AOvVaw0S9ak4Y_nKy5X1r4alhRtS"><img width="33" height="33" src="https://ci3.googleusercontent.com/meips/ADKq_NZxAdIU3eRhJqF8PfQpL0gZAj4ovvZCNNIY4aDVSWm4yfk_nW9A5s6Dt3oi9y4mthvIgZViU5HaXEcUUK6Vx8sClYSC_nYEEwuRmnXan-ZJzjuWbkKNkw=s0-d-e1-ft#https://s1g.s3.amazonaws.com/85231364dae3871f3e2465f0e3e47239.png" alt="Instagram" style="border:none;vertical-align:baseline" class="CToWUd" data-bit="iit"></a></td></tr></tbody></table><a href="https://cleanaffinity.com/home-cleaning-services-dallas/" style="background-color:transparent;color:rgb(0,0,0)" target="_blank" data-saferedirecturl="https://www.google.com/url?q=https://cleanaffinity.com/home-cleaning-services-dallas/&amp;source=gmail&amp;ust=1753390838453000&amp;usg=AOvVaw2n1bKaSwZdhhL_nJ_5XRq2">cleanaffinity.com/</a><br></td></tr></tbody></table>
+            """
 
-        # Convert message text to HTML, preserving line breaks and paragraphs
+
         html_message = convert_text_to_html(message_text) + footer_html
+        plain_text = message_text + "\n\nBest regards,\nClean Affinity\n503-933-1917\nwww.cleanaffinity.com"
 
-        # Plain text version of the message
-        plain_text = message_text + "\n\nBest regards,\nClean Affinity\nYour Company Address\nPhone Number\nwww.yourwebsite.com"
-
-        # Attach both plain text and HTML versions of the message
         message.attach(MIMEText(plain_text, 'plain'))
         message.attach(MIMEText(html_message, 'html'))
 
-        # Add headers
         message['to'] = receiver
-        message['from'] = "hello@cleanaffinity.com"
+        if area.upper() == "PDX":
+            message['from'] = "hello@cleanaffinity.com"
+        else:
+            message['from'] = "hellodfw@cleanaffinity.com"
         message['subject'] = subject
 
-        # Encode the message as base64 for the Gmail API
         raw = base64.urlsafe_b64encode(message.as_bytes()).decode()
-
-        draft_body = {
-            'message': {
-                'raw': raw
-            }
-        }
-
-        # Create the draft
+        draft_body = {'message': {'raw': raw}}
         draft = service.users().drafts().create(userId='me', body=draft_body).execute()
         logging.debug(f"Draft created with ID: {draft['id']}")
 
-        # Retrieve the message ID from the draft
         message_id = draft['message']['id']
 
-        # Create or get the label ID
-        label_id = create_label_if_not_exists(service, 'me', label_name)
-        if label_id:
-            # Apply the label to the message in the draft
-            apply_label_to_message(service, 'me', message_id, label_id)
+        # Ensure both labels exist
+        label_ids = []
+        in_process_id = create_label_if_not_exists(service, 'me', label_name, area)
+        if in_process_id:
+            label_ids.append(in_process_id)
+
+        if area.upper() == "DFW":
+            dfw_id = create_label_if_not_exists(service, 'me', "DFW", area)
+            if dfw_id:
+                label_ids.append(dfw_id)
+
+        # Apply labels
+        if label_ids:
+            apply_label_to_message(service, 'me', message_id, label_ids[0])
+            for label_id in label_ids[1:]:
+                apply_label_to_message(service, 'me', message_id, label_id)
 
         return draft
+
     except Exception as e:
         logging.error(f"An error occurred while creating a draft: {e}")
         return None
-
 
 def authenticate_gmail():
     try:
@@ -209,7 +284,8 @@ def authenticate_gmail():
         return None
 
 
-def create_draft_route(subject, message_text, gmail):
+def create_draft_route(subject, message_text, gmail, market):
+    print("this is the mark in creat draft route", market)
     creds = authenticate_gmail()
     if not creds:
         return "Failed to authenticate with Gmail."
@@ -219,12 +295,12 @@ def create_draft_route(subject, message_text, gmail):
     # Create the draft
     user_info = service.users().getProfile(userId='me').execute()
     sender_email = user_info['emailAddress']
-    draft = create_draft(service, "Clean Affinity", sender_email, subject, message_text, gmail)
+    draft = create_draft(service, "Clean Affinity", sender_email, subject, message_text, gmail, market)
 
 
-def add_to_spreadsheet(raw_data):
+def add_to_spreadsheet(raw_data, mrkt, tx_factors, dfw_amount, pdx_prices, dfw_prices):
     # Path to your credentials.json file
-    creds_file = r'emailsenderthingy.json'
+    creds_file = r'vibrant-arcanum-432521-q2-e55244124dd0 (1).json'
 
     # Connect to the Google Sheets API
     creds = Credentials.from_service_account_file(creds_file, scopes=["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive", 'https://www.googleapis.com/auth/gmail.modify'])
@@ -236,7 +312,7 @@ def add_to_spreadsheet(raw_data):
 
     # print("eawe", raw_data)
     print(raw_data, "THSI WE RAWWW")
-    data = revise_list(raw_data)
+    data = revise_list(raw_data, mrkt, tx_factors, dfw_amount, pdx_prices, dfw_prices)
     # print("rege", data)
 
     try:
@@ -271,10 +347,17 @@ months_list = ("January", "February", "March", "April", "May", "June", "July", "
 month = months_list[today.month-1]
 
 
-def update_prices():
-    global ot, initial, move, monthly, biweekly, weekly
-    ot, initial, move, monthly, biweekly, weekly = map(float, update_servers())
-    print("Price successfully updated!")
+def update_prices(mark, ot, initial, move, monthly, biweekly, weekly):
+    factors, texas_factors = update_servers(mark)
+    set_ot, set_initial, set_move, set_monthly, set_biweekly, set_weekly = map(float, factors)
+    # print(texas_factors)
+    if (ot, initial, move, monthly, biweekly, weekly) == (set_ot, set_initial, set_move, set_monthly, set_biweekly,
+                                                          set_weekly):
+        print("No change needed")
+    else:
+        ot, initial, move, monthly, biweekly, weekly = set_ot, set_initial, set_move, set_monthly, set_biweekly, set_weekly
+        print("Prices successfully updated!")
+    return texas_factors, ot, initial, move, monthly, biweekly, weekly
 
 
 def calc_sqft_price(sqft):
@@ -297,46 +380,75 @@ def calc_sqft_price(sqft):
     return sqft_price
 
 
-def autocalc(sqft, beds, baths, type_clean, name_first, name_last, username, city):
+def autocalc(sqft, beds, baths, type_clean, name_first, name_last, username, city, market, texas_factors, pricing):
+    print(market)
     print(sqft, beds, baths, type_clean, name_first, name_last, username, city)
+    ot = pricing['ot']
+    move = pricing['move']
+    initial = pricing['initial']
+    weekly = pricing['weekly']
+    biweekly = pricing['biweekly']
+    monthly = pricing['monthly']
+
     elite = 200
     ongoing = 140
     try:
-        if type(sqft) != None:
-            try:
-                # These are the base prices that are the minimum cost of cleans
-                try:
-                    price_sqft = calc_sqft_price(int(sqft))
-                except TypeError:
-                    print("Error Loading Quote")
-                # On the calculator on excelsheet, "NO TOUCH k9" is the same as "before price"
-                before_price = float(baths) * 30 + float(beds) * 5 + price_sqft
+        # These are the base prices that are the minimum cost of cleans
+        try:
+            price_sqft = calc_sqft_price(int(sqft))
+            before_price = float(baths) * 30 + float(beds) * 5 + price_sqft
+        except ValueError:
+            print("Error Loading Quote")
 
-                # ["ONETIME", "MOVE", "WEEKLY", "BIWEEKLY", "MONTHLY"]
-                if type_clean == 0:
-                    elite = before_price * ot
-                if type_clean == 1:
-                    elite = before_price * move
-                if type_clean == 2:
-                    ongoing = before_price * weekly
-                if type_clean == 3:
-                    ongoing = before_price * biweekly
-                if type_clean == 4:
-                    ongoing = before_price * monthly
+        # ["ONETIME", "MOVE", "WEEKLY", "BIWEEKLY", "MONTHLY"]
+        dfw_type_clean = type_clean
+        # print(dfw_type_clean)
+        if type_clean == 0:
+            elite = before_price * ot
+        if type_clean == 1:
+            elite = before_price * move
+        if type_clean == 2:
+            ongoing = before_price * weekly
+        if type_clean == 3:
+            ongoing = before_price * biweekly
+        if type_clean == 4:
+            ongoing = before_price * monthly
+        if dfw_type_clean >= 1:
+            dfw_type_clean += 1
 
-                if type_clean == 2 or type_clean == 3 or type_clean == 4:
-                    elite = before_price * initial
-                    if ongoing < 140:
-                        ongoing = 140
-                if elite < 200:
-                    elite = 200
+        # Order of cleanings is switched on the estimator to go OT initial move monthly biweekly week. So i swap the weekly and monthly numbers
+        if dfw_type_clean == 3:
+            dfw_type_clean = 5
+        elif dfw_type_clean == 5:
+            dfw_type_clean = 3
 
-                title = get_title(sqft, beds, baths, type_clean, name_last, name_first)
-                main_info = get_quote(month, round(elite), round(ongoing), type_clean, name_first, username, city)
+        if market == "DFW":
+            elite = elite * texas_factors[dfw_type_clean]
 
-            except ValueError and UnboundLocalError and IndexError and UnboundLocalError:
-                print("Error Loading Quote")
-            return title, main_info
+        # print(texas_factors)
+        # print(elite, texas_factors[dfw_type_clean])
+
+        if type_clean == 2 or type_clean == 3 or type_clean == 4:
+            elite = before_price * initial
+            if ongoing < 140:
+                ongoing = 140
+                
+        if type_clean == 1:
+            if elite < 250:
+                elite = 250
+            if market == "DFW":
+                elite = elite * texas_factors[dfw_type_clean]
+        else:
+            if elite < 200:
+                elite = 200
+        if market == "DFW":
+            ongoing = ongoing * texas_factors[dfw_type_clean]
+        # print(before_price, elite, "moving factor", move, texas_factors[dfw_type_clean], texas_factors)
+
+        title = get_title(sqft, beds, baths, type_clean, name_last, name_first)
+        main_info = get_quote(month, round(elite), round(ongoing), type_clean, name_first, username, city)
+        return title, main_info
+
     except TypeError:
         return "nothing", "nothing"
 
