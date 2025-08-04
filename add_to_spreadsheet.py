@@ -402,7 +402,6 @@ def autocalc(sqft, beds, baths, type_clean, name_first, name_last, username, cit
 
         # ["ONETIME", "MOVE", "WEEKLY", "BIWEEKLY", "MONTHLY"]
         dfw_type_clean = type_clean
-        # print(dfw_type_clean)
         if type_clean == 0:
             elite = before_price * ot
         if type_clean == 1:
@@ -429,11 +428,13 @@ def autocalc(sqft, beds, baths, type_clean, name_first, name_last, username, cit
             elite = before_price * initial
             if ongoing < 140:
                 ongoing = 140
-        if market == "DFW":
+
+        # DFW type is 6 when you select far
+        if market == "DFW" and dfw_type_clean != 6:
             ongoing = ongoing * texas_factors[dfw_type_clean]
         if type_clean != 1 and type_clean != 0:
-            if market == "DFW":
-                elite = elite * texas_factors[dfw_type_clean]
+            # if market == "DFW":
+            #     elite = elite * texas_factors[dfw_type_clean]
             if elite < 200:
                 elite = 200
         else:
