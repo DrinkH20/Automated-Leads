@@ -491,7 +491,7 @@ def get_title(sqft, beds, baths, part_list, last, first):
 def get_quote(date_month, initial, recuring, part_list, name="there", username="", city=""):
     scripts = [f"""Hi{name},
 
-We're grateful for the opportunity to help with your cleaning needs!
+We’re excited to help make your home feel fresh and spotless!
 
 Based on the info you provided and our {date_month} special, your one-time clean will be ${initial} (Includes washing all interior window panes within arms reach!)
 •	        Would you like any extras like fridge, oven, window blind or track cleaning?
@@ -501,7 +501,7 @@ Please let me know if you would like to get on the schedule and if you have any 
 We look forward to cleaning for you!
 {username}""", f"""Hi{name},
 
-We're grateful for the opportunity to help with your cleaning needs!
+We’re excited to help make your home feel fresh and spotless!
 
 Based on the info you provided and our {date_month} special, your moving clean will be ${initial} (Includes washing all interior window panes within arms reach!)
 •	        Would you like any extras like fridge, oven, window blind or track cleaning?
@@ -511,7 +511,7 @@ Please let me know if you would like to get on the schedule and if you have any 
 We look forward to cleaning for you!
 {username}""", f"""Hi{name}!
 
-We're grateful for the opportunity to help with your cleaning needs!
+We’re excited to help make your home feel fresh and spotless!
 
 Based on the info provided, and a special we are running for {date_month}, your initial reset clean will be 50% off at ${initial} (this clean will be 2-3x as long and includes washing all interior window panes within arms reach) and weekly service is ${recuring}.
 
@@ -521,7 +521,7 @@ We look forward to cleaning for you!
 {username}
 """, f"""Hi{name}!
 
-We're grateful for the opportunity to help with your cleaning needs!
+We’re excited to help make your home feel fresh and spotless!
 
 Based on the info provided, and a special we are running for {date_month}, your initial reset clean will be 50% off at ${initial} (this clean will be 2-3x as long and includes washing all interior window panes within arms reach) and biweekly service is ${recuring}.
 
@@ -531,7 +531,7 @@ We look forward to cleaning for you!
 {username}
 """, f"""Hi{name}!
 
-We're grateful for the opportunity to help with your cleaning needs!
+We’re excited to help make your home feel fresh and spotless!
 
 Based on the info provided, and a special we are running for {date_month}, your initial reset clean will be 50% off at ${initial} (this clean will be 2-3x as long and includes washing all interior window panes within arms reach) and monthly service is ${recuring}.
 
@@ -618,7 +618,7 @@ Is this something I can get on the schedule for you?
 def failed(date_month, username=""):
     scripts = f"""Hi there!
 
-We're grateful for the opportunity to help with your cleaning needs!
+We’re excited to help make your home feel fresh and spotless!
 
 Could you provide the number of bedrooms and bathrooms along with the square footage of the house so I can put a quote together for you?
 
