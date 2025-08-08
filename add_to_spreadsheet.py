@@ -73,8 +73,7 @@ def revise_list(data, mark, factor_dfw, dfw_count, pdx_pricing, dfw_pricing):
                                       last_name, "Joel", city, "DFW", factor_dfw, dfw_pricing)
         draft_list.append((sub, body_text, email))
         count += 1
-        # create_draft_route(sub, body_text, email, mark)
-        # print("create_draft")
+
     # Send drafts, labeling the last dfw_amount as DFW
     total = len(draft_list)
     for i, (sub, body_text, email) in enumerate(draft_list):
@@ -138,54 +137,6 @@ def convert_text_to_html(message_text):
     return html_message
 
 
-# def create_draft(service, sender_name, sender, subject, message_text, receiver, area, label_name='Leads In Process'):
-#     try:
-#         print(area, "sjhdf this one")
-#         # Create the message
-#         message = MIMEMultipart('alternative')
-#         formatted_sender = formataddr((sender_name, sender))
-#
-#         html_message = convert_text_to_html(message_text) + "<br><br>— Clean Affinity"
-#         plain_text = message_text + "\n\n— Clean Affinity"
-#
-#         message.attach(MIMEText(plain_text, 'plain'))
-#         message.attach(MIMEText(html_message, 'html'))
-#
-#         message['to'] = receiver
-#         message['from'] = "hello@cleanaffinity.com"
-#         message['subject'] = subject
-#
-#         raw = base64.urlsafe_b64encode(message.as_bytes()).decode()
-#
-#         draft_body = {'message': {'raw': raw}}
-#         draft = service.users().drafts().create(userId='me', body=draft_body).execute()
-#         logging.debug(f"Draft created with ID: {draft['id']}")
-#
-#         # Get the message ID
-#         message_id = draft['message']['id']
-#
-#         # Ensure both labels exist
-#         label_ids = []
-#         in_process_id = create_label_if_not_exists(service, 'me', label_name, area)
-#         if in_process_id:
-#             label_ids.append(in_process_id)
-#
-#         if area.upper() == "DFW":
-#             dfw_id = create_label_if_not_exists(service, 'me', "DFW", area)
-#             if dfw_id:
-#                 label_ids.append(dfw_id)
-#
-#         # Apply labels
-#         if label_ids:
-#             apply_label_to_message(service, 'me', message_id, label_ids[0])  # Always apply at least one
-#             for label_id in label_ids[1:]:
-#                 apply_label_to_message(service, 'me', message_id, label_id)
-#
-#         return draft
-#
-#     except Exception as e:
-#         logging.error(f"An error occurred while creating a draft: {e}")
-#         return None
 def create_draft(service, sender_name, sender, subject, message_text, receiver, area, label_name='Leads In Process'):
     try:
         print(area, "sjhdf this one")
@@ -193,10 +144,6 @@ def create_draft(service, sender_name, sender, subject, message_text, receiver, 
         message = MIMEMultipart('alternative')
         formatted_sender = formataddr((sender_name, sender))
 
-        # Signature footer HTML
-        # footer_html = """
-        #         <div dir="ltr"><img data-aii="CiExZnhMN2ttWDdra2RHdlY5Z1U4ODhUTHdlZEpVSEYwbTU" src="https://ci3.googleusercontent.com/mail-sig/AIorK4wK5N0Ul0HHETT-MTvAGX0Ry6a3go9OyEQWmOp7woQXvjOF0DXhwxdbLs-viIsdHmS9hkuL_CG6fN7M" data-os="https://lh3.googleusercontent.com/d/1fxL7kmX7kkdGvV9gU888TLwedJUHF0m5"><br><table cellpadding="0" cellspacing="0" style="color:rgb(255,255,255);font-size:medium;vertical-align:-webkit-baseline-middle;font-family:Arial"><tbody><tr><td><table cellpadding="0" cellspacing="0" style="vertical-align:-webkit-baseline-middle;font-family:Arial"><tbody><tr><td style="vertical-align:top"><table cellpadding="0" cellspacing="0" style="vertical-align:-webkit-baseline-middle;font-family:Arial"><tbody><tr><td style="text-align:center"></td></tr><tr><td height="30"></td></tr><tr><td style="text-align:center"><table cellpadding="0" cellspacing="0" style="vertical-align:-webkit-baseline-middle;font-family:Arial;display:inline-block"><tbody><tr><td><a href="https://www.facebook.com/cleanaffinity/" color="#3fcdd2" style="display:inline-block;padding:0px;background-color:rgb(63,205,210)" target="_blank"><img height="24" src="https://cdn2.hubspot.net/hubfs/53/tools/email-signature-generator/icons/facebook-icon-2x.png" alt="facebook" color="#3fcdd2" style="max-width:135px;display:block"></a></td><td width="5"><div></div></td><td><a href="https://twitter.com/clean_affinity" color="#3fcdd2" style="display:inline-block;padding:0px;background-color:rgb(63,205,210)" target="_blank"><img height="24" src="https://cdn2.hubspot.net/hubfs/53/tools/email-signature-generator/icons/twitter-icon-2x.png" alt="twitter" color="#3fcdd2" style="max-width:135px;display:block"></a></td><td width="5"><div></div></td><td><a href="https://www.linkedin.com/company/cleanaffinity" color="#3fcdd2" style="display:inline-block;padding:0px;background-color:rgb(63,205,210)" target="_blank"><img height="24" src="https://cdn2.hubspot.net/hubfs/53/tools/email-signature-generator/icons/linkedin-icon-2x.png" alt="linkedin" color="#3fcdd2" style="max-width:135px;display:block"></a></td><td width="5"><div></div></td><td><a href="https://instagram.com/cleanaffinity" color="#3fcdd2" style="display:inline-block;padding:0px;background-color:rgb(63,205,210)" target="_blank"><img height="24" src="https://cdn2.hubspot.net/hubfs/53/tools/email-signature-generator/icons/instagram-icon-2x.png" alt="instagram" color="#3fcdd2" style="max-width:135px;display:block"></a></td><td width="5"><div></div></td></tr></tbody></table></td></tr></tbody></table></td><td width="46"><div></div></td><td style="padding:0px;vertical-align:middle"><h3 color="#000000" style="margin:0px;font-size:18px;color:rgb(0,0,0)">Office Team</h3><p color="#000000" style="margin:0px;color:rgb(0,0,0);font-size:14px;line-height:22px">Clean Affinity</p><table cellpadding="0" cellspacing="0" style="vertical-align:-webkit-baseline-middle;font-family:Arial;width:234px"><tbody><tr><td height="30"></td></tr><tr><td height="1" color="#3FCDD2" style="width:234px;border-bottom:1px solid rgb(63,205,210);border-left:none;display:block"></td></tr><tr><td height="30"></td></tr></tbody></table><table cellpadding="0" cellspacing="0" style="vertical-align:-webkit-baseline-middle;font-family:Arial"><tbody><tr height="25" style="vertical-align:middle"><td width="30" style="vertical-align:middle"><table cellpadding="0" cellspacing="0" style="vertical-align:-webkit-baseline-middle;font-family:Arial"><tbody><tr><td style="vertical-align:bottom"><span width="11" color="#3FCDD2" style="display:block;background-color:rgb(63,205,210)"><img width="13" src="https://cdn2.hubspot.net/hubfs/53/tools/email-signature-generator/icons/phone-icon-2x.png" color="#3FCDD2" style="display:block"></span></td></tr></tbody></table></td><td style="padding:0px;color:rgb(0,0,0)"><a href="tel:503-933-1917" color="#000000" style="color:rgb(0,0,0);font-size:12px" target="_blank">503-933-1917</a></td></tr><tr height="25" style="vertical-align:middle"><td width="30" style="vertical-align:middle"><table cellpadding="0" cellspacing="0" style="vertical-align:-webkit-baseline-middle;font-family:Arial"><tbody><tr><td style="vertical-align:bottom"><span width="11" color="#3FCDD2" style="display:block;background-color:rgb(63,205,210)"><img width="13" src="https://cdn2.hubspot.net/hubfs/53/tools/email-signature-generator/icons/email-icon-2x.png" color="#3FCDD2" style="display:block"></span></td></tr></tbody></table></td><td style="padding:0px"><a href="mailto:hello@cleanaffinity.com" color="#000000" style="color:rgb(0,0,0);font-size:12px" target="_blank">hello@cleanaffinity.com</a></td></tr><tr height="25" style="vertical-align:middle"><td width="30" style="vertical-align:middle"><table cellpadding="0" cellspacing="0" style="vertical-align:-webkit-baseline-middle;font-family:Arial"><tbody><tr><td style="vertical-align:bottom"><span width="11" color="#3FCDD2" style="display:block;background-color:rgb(63,205,210)"><img width="13" src="https://cdn2.hubspot.net/hubfs/53/tools/email-signature-generator/icons/link-icon-2x.png" color="#3FCDD2" style="display:block"></span></td></tr></tbody></table></td><td style="padding:0px"><a href="https://www.cleanaffinity.com/" color="#000000" style="color:rgb(0,0,0);font-size:12px" target="_blank">www.cleanaffinity.com</a></td></tr><tr height="25" style="vertical-align:middle"><td width="30" style="vertical-align:middle"><br></td><td style="padding:0px"><br></td></tr></tbody></table></td></tr></tbody></table></td></tr><tr><td></td></tr></tbody></table><table cellpadding="0" cellspacing="0" style="color:rgb(255,255,255);font-size:medium;vertical-align:-webkit-baseline-middle;font-family:Arial"><tbody><tr><td><table cellpadding="0" cellspacing="0" style="vertical-align:-webkit-baseline-middle;font-family:Arial"><tbody><tr><td style="vertical-align:top"></td><td width="46"></td><td style="padding:0px;vertical-align:middle"><table cellpadding="0" cellspacing="0" style="vertical-align:-webkit-baseline-middle;font-family:Arial"><tbody><tr><td height="30"></td></tr></tbody></table></td></tr></tbody></table></td></tr></tbody></table></div>
-        #                 """
         if area.upper() != "DFW":
             footer_html = """
             <table width="206" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;border-spacing:0px;color:rgb(20,49,65);font-family:proxima-nova,sans-serif;font-size:16px"><tbody><tr><td style="margin:auto;padding:0px 0px 1px"><a href="https://cleanaffinity.com/" style="background-color:transparent;color:rgb(35,82,124);outline:0px;display:inline-block" target="_blank" data-saferedirecturl="https://www.google.com/url?q=https://cleanaffinity.com/&amp;source=gmail&amp;ust=1753387360204000&amp;usg=AOvVaw1_qGxFX9vNvZj88nCJmRhf"><img width="200" src="https://ci3.googleusercontent.com/meips/ADKq_NaHCjqRyVIbvhTlEb3vGPvT6jjSyDbNyBJE7ZhgTdaYGWQ2Ux1vTrGvxNSFWCoI_7YLbi2lyvNToByk2wku5X4Ty3j2kGBnqDThP-lz5meLf3ComXVwEg=s0-d-e1-ft#https://s1g.s3.amazonaws.com/325e6b8720f2f9a00d074326edf01a9f.png" style="border:none;vertical-align:baseline" class="CToWUd" data-bit="iit"></a></td></tr><tr><td height="4" style="padding:0px;border-top:3px solid rgb(0,0,0)"></td></tr><tr><td style="padding:0px;vertical-align:middle;color:rgb(0,0,0);font-size:12px;font-family:helvetica,arial"><span style="font-weight:700"><span style="font-size:15px">Office Team</span></span><br><br><table cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;border-spacing:0px;background-color:transparent;margin:0px 1px 1px 0px"><tbody><tr><td style="padding:0px 1px 0px 0px"><img width="33" height="33" src="https://ci3.googleusercontent.com/meips/ADKq_Nbu8BcqvPO0NsMt0thKm1fy5BM-bke3tekFIPLPj8-lOIllqWmOXD_sNYvqyTuFPb8NZLkVMMT1KtHKvYpfxBq-1Rs_P3kVVbF3j3_umEaigthjxIeBBg=s0-d-e1-ft#https://s1g.s3.amazonaws.com/3e17acc3e1f17ca0eb066f92112030d4.png" alt="email" style="border:none;vertical-align:baseline" class="CToWUd" data-bit="iit"></td><td style="padding:0px"><span style="font-size-adjust:none;font-stretch:normal;line-height:normal"><a href="mailto:hello@cleanaffinity.com" style="background-color:transparent;color:rgb(0,0,0)" target="_blank">hello@cleanaffinity.com</a></span></td></tr></tbody></table><table cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;border-spacing:0px;background-color:transparent;margin:0px 1px 1px 0px"><tbody><tr><td style="padding:0px 1px 0px 0px"><img width="33" height="33" src="https://ci3.googleusercontent.com/meips/ADKq_NbOvxEt5lgrvY7In4555tR498ZHVnamfeiNDuz0ihljVAOsV1JEkU7A8huN48KtfFD-RaiqMdvdbpefi2ElxhXdGOXBcb5OIoj2c5IudggNYU8JcBIWxA=s0-d-e1-ft#https://s1g.s3.amazonaws.com/6d17a9904ea926bfe5700c3e877f70c0.png" alt="mobile" style="border:none;vertical-align:baseline" class="CToWUd" data-bit="iit"></td><td style="padding:0px"><span style="font-size-adjust:none;font-stretch:normal;line-height:normal"><a href="tel:503-933-1917" target="_blank">503-933-1917</a></span></td></tr></tbody></table><table cellpadding="0" border="0" style="border-collapse:collapse;border-spacing:0px;background-color:transparent"><tbody><tr><td style="padding:0px 5px 0px 0px"><a href="https://facebook.com/cleanaffinity/" style="background-color:transparent;color:rgb(51,122,183);display:inline-block" target="_blank" data-saferedirecturl="https://www.google.com/url?q=https://facebook.com/cleanaffinity/&amp;source=gmail&amp;ust=1753387360204000&amp;usg=AOvVaw1PokiaSIca2gSp9_r74Pu2"><img width="33" height="33" src="https://ci3.googleusercontent.com/meips/ADKq_NarBJHUDBNpZSF5x9fwZRDVzxrCJQ0OjwhhH5kt5Prfkk-Ae1pCwBmyRD2fyPtAklyAZDBnTH8kUNq8b1zU9cy_YXAjjV7JVzc_0XoliAgiyxNqz8x5gw=s0-d-e1-ft#https://s1g.s3.amazonaws.com/2c5fe92c2cad30bc7beafa503141662b.png" alt="Facebook" style="border:none;vertical-align:baseline" class="CToWUd" data-bit="iit"></a></td><td style="padding:0px 5px 0px 0px"><a href="https://instagram.com/cleanaffinity/" style="background-color:transparent;color:rgb(51,122,183);display:inline-block" target="_blank" data-saferedirecturl="https://www.google.com/url?q=https://instagram.com/cleanaffinity/&amp;source=gmail&amp;ust=1753387360204000&amp;usg=AOvVaw16I4Z5Yx74Y6W15ySxm9yJ"><img width="33" height="33" src="https://ci3.googleusercontent.com/meips/ADKq_NZxAdIU3eRhJqF8PfQpL0gZAj4ovvZCNNIY4aDVSWm4yfk_nW9A5s6Dt3oi9y4mthvIgZViU5HaXEcUUK6Vx8sClYSC_nYEEwuRmnXan-ZJzjuWbkKNkw=s0-d-e1-ft#https://s1g.s3.amazonaws.com/85231364dae3871f3e2465f0e3e47239.png" alt="Instagram" style="border:none;vertical-align:baseline" class="CToWUd" data-bit="iit"></a></td></tr></tbody></table><a href="https://cleanaffinity.com/" style="background-color:transparent;color:rgb(0,0,0)" target="_blank" data-saferedirecturl="https://www.google.com/url?q=https://cleanaffinity.com/&amp;source=gmail&amp;ust=1753387360204000&amp;usg=AOvVaw1_qGxFX9vNvZj88nCJmRhf">cleanaffinity.com/</a><br></td></tr></tbody></table>
@@ -205,7 +152,6 @@ def create_draft(service, sender_name, sender, subject, message_text, receiver, 
             footer_html = """
             <table width="206" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;border-spacing:0px;color:rgb(20,49,65);font-family:proxima-nova,sans-serif;font-size:16px"><tbody><tr><td style="margin:auto;padding:0px 0px 1px"><a href="https://cleanaffinity.com/" style="background-color:transparent;color:rgb(35,82,124);outline:0px;display:inline-block" target="_blank" data-saferedirecturl="https://www.google.com/url?q=https://cleanaffinity.com/&amp;source=gmail&amp;ust=1753390838452000&amp;usg=AOvVaw1Jdh4ThRFl97qfd7jNlOSq"><img width="200" src="https://ci3.googleusercontent.com/meips/ADKq_NaHCjqRyVIbvhTlEb3vGPvT6jjSyDbNyBJE7ZhgTdaYGWQ2Ux1vTrGvxNSFWCoI_7YLbi2lyvNToByk2wku5X4Ty3j2kGBnqDThP-lz5meLf3ComXVwEg=s0-d-e1-ft#https://s1g.s3.amazonaws.com/325e6b8720f2f9a00d074326edf01a9f.png" style="border:none;vertical-align:baseline" class="CToWUd" data-bit="iit"></a></td></tr><tr><td height="4" style="padding:0px;border-top:3px solid rgb(0,0,0)"></td></tr><tr><td style="padding:0px;vertical-align:middle;color:rgb(0,0,0);font-size:12px;font-family:helvetica,arial"><span style="font-weight:700"><span style="font-size:15px">Office Team</span></span><br><br><table cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;border-spacing:0px;background-color:transparent;margin:0px 1px 1px 0px"><tbody><tr><td style="padding:0px 1px 0px 0px"><img width="33" height="33" src="https://ci3.googleusercontent.com/meips/ADKq_Nbu8BcqvPO0NsMt0thKm1fy5BM-bke3tekFIPLPj8-lOIllqWmOXD_sNYvqyTuFPb8NZLkVMMT1KtHKvYpfxBq-1Rs_P3kVVbF3j3_umEaigthjxIeBBg=s0-d-e1-ft#https://s1g.s3.amazonaws.com/3e17acc3e1f17ca0eb066f92112030d4.png" alt="email" style="border:none;vertical-align:baseline" class="CToWUd" data-bit="iit"></td><td style="padding:0px"><span style="font-size-adjust:none;font-stretch:normal;line-height:normal"><a href="mailto:hellodfw@cleanaffinity.com" style="background-color:transparent;color:rgb(0,0,0)" target="_blank">hellodfw@cleanaffinity.com</a></span></td></tr></tbody></table><table cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;border-spacing:0px;background-color:transparent;margin:0px 1px 1px 0px"><tbody><tr><td style="padding:0px 1px 0px 0px"><img width="33" height="33" src="https://ci3.googleusercontent.com/meips/ADKq_NbOvxEt5lgrvY7In4555tR498ZHVnamfeiNDuz0ihljVAOsV1JEkU7A8huN48KtfFD-RaiqMdvdbpefi2ElxhXdGOXBcb5OIoj2c5IudggNYU8JcBIWxA=s0-d-e1-ft#https://s1g.s3.amazonaws.com/6d17a9904ea926bfe5700c3e877f70c0.png" alt="mobile" style="border:none;vertical-align:baseline" class="CToWUd" data-bit="iit"></td><td style="padding:0px"><span style="font-size-adjust:none;font-stretch:normal;line-height:normal"><a href="tel:972-318-4678" target="_blank">972-318-4678</a></span></td></tr></tbody></table><table cellpadding="0" border="0" style="border-collapse:collapse;border-spacing:0px;background-color:transparent"><tbody><tr><td style="padding:0px 5px 0px 0px"><a href="https://facebook.com/cleanaffinity/" style="background-color:transparent;color:rgb(51,122,183);display:inline-block" target="_blank" data-saferedirecturl="https://www.google.com/url?q=https://facebook.com/cleanaffinity/&amp;source=gmail&amp;ust=1753390838453000&amp;usg=AOvVaw3nrk9R9LBXsHPIEY36yHhu"><img width="33" height="33" src="https://ci3.googleusercontent.com/meips/ADKq_NarBJHUDBNpZSF5x9fwZRDVzxrCJQ0OjwhhH5kt5Prfkk-Ae1pCwBmyRD2fyPtAklyAZDBnTH8kUNq8b1zU9cy_YXAjjV7JVzc_0XoliAgiyxNqz8x5gw=s0-d-e1-ft#https://s1g.s3.amazonaws.com/2c5fe92c2cad30bc7beafa503141662b.png" alt="Facebook" style="border:none;vertical-align:baseline" class="CToWUd" data-bit="iit"></a></td><td style="padding:0px 5px 0px 0px"><a href="https://instagram.com/cleanaffinity/" style="background-color:transparent;color:rgb(51,122,183);display:inline-block" target="_blank" data-saferedirecturl="https://www.google.com/url?q=https://instagram.com/cleanaffinity/&amp;source=gmail&amp;ust=1753390838453000&amp;usg=AOvVaw0S9ak4Y_nKy5X1r4alhRtS"><img width="33" height="33" src="https://ci3.googleusercontent.com/meips/ADKq_NZxAdIU3eRhJqF8PfQpL0gZAj4ovvZCNNIY4aDVSWm4yfk_nW9A5s6Dt3oi9y4mthvIgZViU5HaXEcUUK6Vx8sClYSC_nYEEwuRmnXan-ZJzjuWbkKNkw=s0-d-e1-ft#https://s1g.s3.amazonaws.com/85231364dae3871f3e2465f0e3e47239.png" alt="Instagram" style="border:none;vertical-align:baseline" class="CToWUd" data-bit="iit"></a></td></tr></tbody></table><a href="https://cleanaffinity.com/home-cleaning-services-dallas/" style="background-color:transparent;color:rgb(0,0,0)" target="_blank" data-saferedirecturl="https://www.google.com/url?q=https://cleanaffinity.com/home-cleaning-services-dallas/&amp;source=gmail&amp;ust=1753390838453000&amp;usg=AOvVaw2n1bKaSwZdhhL_nJ_5XRq2">cleanaffinity.com/</a><br></td></tr></tbody></table>
             """
-
 
         html_message = convert_text_to_html(message_text) + footer_html
         plain_text = message_text + "\n\nBest regards,\nClean Affinity\n503-933-1917\nwww.cleanaffinity.com"
@@ -249,6 +195,7 @@ def create_draft(service, sender_name, sender, subject, message_text, receiver, 
     except Exception as e:
         logging.error(f"An error occurred while creating a draft: {e}")
         return None
+
 
 def authenticate_gmail():
     try:
@@ -421,8 +368,6 @@ def autocalc(sqft, beds, baths, type_clean, name_first, name_last, username, cit
         elif dfw_type_clean == 5:
             dfw_type_clean = 3
 
-        # if market == "DFW":
-        #     elite = elite * texas_factors[dfw_type_clean]
 
         if type_clean == 2 or type_clean == 3 or type_clean == 4:
             elite = before_price * initial
@@ -433,8 +378,7 @@ def autocalc(sqft, beds, baths, type_clean, name_first, name_last, username, cit
         if market == "DFW" and dfw_type_clean != 6:
             ongoing = ongoing * texas_factors[dfw_type_clean]
         if type_clean != 1 and type_clean != 0:
-            # if market == "DFW":
-            #     elite = elite * texas_factors[dfw_type_clean]
+
             if elite < 200:
                 elite = 200
         else:
@@ -443,7 +387,11 @@ def autocalc(sqft, beds, baths, type_clean, name_first, name_last, username, cit
         # print(before_price, elite, "moving factor", move, texas_factors[dfw_type_clean], texas_factors)
 
         title = get_title(sqft, beds, baths, type_clean, name_last, name_first)
-        main_info = get_quote(month, round(elite), round(ongoing), type_clean, name_first, username, city)
+        if market == "DFW":
+            main_info = get_quote_dfw(month, round(elite), round(ongoing), type_clean, name_first, username, city)
+        else:
+            main_info = get_quote(month, round(elite), round(ongoing), type_clean, name_first, username, city)
+
         return title, main_info
 
     except TypeError:
@@ -538,6 +486,67 @@ Based on the info provided, and a special we are running for {date_month}, your 
 Please let me know if you would like to get on the schedule and if you have any preferred days/times. Our schedule fills up quickly (especially for the longer initial clean!), but we still have a few spots in {date_month}! What works best?
 
 We look forward to cleaning for you!
+{username}
+"""]
+    return scripts[part_list]
+
+
+def get_quote_dfw(date_month, initial, recuring, part_list, name="there", username="", city=""):
+    scripts = [f"""Hi{name},
+
+We’re excited to help make your home feel fresh and spotless!
+
+Based on the info you provided and our {date_month} special, your one-time clean will be ${initial} (Includes washing all interior window panes within arms reach!)
+•	        Would you like any extras like fridge, oven, window blind or track cleaning?
+•	        Are there any other cleaning needs/notes you would like for me to add to our list?
+Please let me know if you would like to get on the schedule and if you have any preferred days/times. Our schedule fills up quickly, but we still have a few spots open in {date_month}!
+
+We look forward to cleaning for you!
+{username}""", f"""Hi{name},
+
+We’re excited to help make your home feel fresh and spotless!
+
+Based on the info you provided and our {date_month} special, your moving clean will be ${initial} (Includes washing all interior window panes within arms reach!)
+•	        Would you like any extras like fridge, oven, window blind or track cleaning?
+•	        Are there any other cleaning needs/notes you would like for me to add to our list?
+Please let me know if you would like to get on the schedule and if you have any preferred days/times. Our schedule fills up quickly, but we still have a few spots open in {date_month}!
+
+We look forward to cleaning for you!
+{username}""", f"""Hi{name}!
+
+We’re excited to help make your home feel fresh and spotless!
+
+Based on the info provided, and a special we are running for {date_month}, your initial reset clean will be 50% off at ${initial} (this clean will be 2-3x as long and includes washing all interior window panes within arms reach) and weekly service is ${recuring}.
+
+LOVE THE CLEAN OR IT’S FREE! — That’s our promise. We back every clean with a 100% Satisfaction Guarantee. If you’re not totally happy, we’ll re-clean for free. Still not feeling it? We’ll refund your clean in full.
+
+Please let me know if you would like to get on the schedule and if you have any preferred days/times. Our schedule fills up quickly (especially for the longer initial clean!), but we still have a few spots in {date_month}! What works best?
+
+We look forward to cleaning for you!
+{username}
+""", f"""Hi{name}!
+
+We’re excited to help make your home feel fresh and spotless!
+
+Based on the info provided, and a special we are running for {date_month}, your initial reset clean will be 50% off at ${initial} (this clean will be 2-3x as long and includes washing all interior window panes within arms reach) and biweekly service is ${recuring}.
+
+LOVE THE CLEAN OR IT’S FREE! — That’s our promise. We back every clean with a 100% Satisfaction Guarantee. If you’re not totally happy, we’ll re-clean for free. Still not feeling it? We’ll refund your clean in full.
+
+Please let me know if you would like to get on the schedule and if you have any preferred days/times. Our schedule fills up quickly (especially for the longer initial clean!), but we still have a few spots in {date_month}! What works best?
+
+We look forward to cleaning for you!
+{username}
+""", f"""Hi{name}!
+
+We’re excited to help make your home feel fresh and spotless!
+
+Based on the info provided, and a special we are running for {date_month}, your initial reset clean will be 50% off at ${initial} (this clean will be 2-3x as long and includes washing all interior window panes within arms reach) and monthly service is ${recuring}.
+
+LOVE THE CLEAN OR IT’S FREE! — That’s our promise. We back every clean with a 100% Satisfaction Guarantee. If you’re not totally happy, we’ll re-clean for free. Still not feeling it? We’ll refund your clean in full.
+
+Please let me know if you would like to get on the schedule and if you have any preferred days/times. Our schedule fills up quickly (especially for the longer initial clean!), but we still have a few spots in {date_month}! What works best?
+
+We look forward to cleaning for you
 {username}
 """]
     return scripts[part_list]

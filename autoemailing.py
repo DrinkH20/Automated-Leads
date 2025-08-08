@@ -11,9 +11,6 @@ from email.mime.text import MIMEText
 import re
 from mapcodes import get_zone
 from add_to_spreadsheet import add_to_spreadsheet
-# ot, initial, move, monthly, biweekly, weekly = 0,0,0,0,0,0
-# market = "PDX"
-# texas_factors, ot, initial, move, monthly, biweekly, weekly = update_prices(market, ot, initial, move, monthly, biweekly, weekly)
 
 app = Flask(__name__)
 
@@ -67,35 +64,6 @@ def authenticate_gmail():
         logging.error(f"An error occurred during authentication: {e}")
         return None
 
-
-
-# def fetch_emails(service, label_id='INBOX'):
-#     try:
-#         emails = []
-#         page_token = None
-#
-#         while True:
-#             results = service.users().messages().list(userId='me', labelIds=[label_id], pageToken=page_token).execute()
-#             messages = results.get('messages', [])
-#             page_token = results.get('nextPageToken')
-#
-#             for message in messages:
-#                 msg = service.users().messages().get(userId='me', id=message['id']).execute()
-#                 headers = msg['payload']['headers']
-#                 subject = next(header['value'] for header in headers if header['name'] == 'Subject')
-#
-#                 # Extract the body of the email
-#                 body = get_email_body(msg['payload'])
-#
-#                 emails.append({'subject': subject, 'body': body})
-#
-#             if not page_token:
-#                 break  # Exit the loop if there are no more pages
-#
-#         return emails
-#     except Exception as e:
-#         logging.error(f"An error occurred: {e}")
-#         return []
 
 def get_label_ids_by_name(service, label_names):
     """
@@ -171,87 +139,6 @@ def decode_base64(data):
     return decoded_bytes.decode('UTF-8')
 
 
-# @app.route('/')
-# def index():
-#     creds = authenticate_gmail()
-#     if not creds:
-#         return "Failed to authenticate with Gmail."
-#
-#     service = build('gmail', 'v1', credentials=creds, cache_discovery=False)
-#     logging.debug("Gmail service created successfully.")
-#
-#     label_name = 'LeadsNotYetContacted'
-#     label_id = get_label_id(service, label_name)
-#
-#     if not label_id:
-#         return f"Label '{label_name}' not found."
-#
-#     all_leads = []
-#     check_first = []
-#     lead_emails_for_doubles = []
-#     lead_type_for_doubles = []
-#     # emails = fetch_emails(service, label_id=label_id)
-#     emails, dfw_emails = fetch_emails(service, label_id=label_id)
-#
-#     chart_of_profitable = [
-#         'weekly',
-#         'biweekly',
-#         'monthly',
-#         'move',
-#         'onetime'
-#         'onetime'
-#     ]
-#
-#     for i in emails:
-#         check_first = parse_email_details(get_cleaned_body(i['body']))
-#         last_lead = check_first
-#         try:
-#             state_parts = last_lead[6]
-#             in_zone = int(state_parts[0])
-#             # print(state_parts[1])
-#             try:
-#                 if in_zone > 0 and int(last_lead[4]) > 0:
-#                     if lead_emails_for_doubles.__contains__(last_lead[2]):
-#                         remove_list_item = lead_emails_for_doubles.index(last_lead[2])
-#                         if chart_of_profitable.index(last_lead[1]) < chart_of_profitable.index(
-#                                 lead_type_for_doubles[remove_list_item]):
-#                             # Removes the duplicate
-#                             all_leads.pop(remove_list_item)
-#                             lead_emails_for_doubles.pop(remove_list_item)
-#                             lead_type_for_doubles.pop(remove_list_item)
-#
-#                             # Adds the better lead
-#                             all_leads.append(parse_email_details(get_cleaned_body(i['body'])))
-#                             lead_emails_for_doubles.append(last_lead[2])
-#                             lead_type_for_doubles.append(last_lead[1])
-#                             print("Removed duplicate lead and replaced with better one.")
-#                         else:
-#                             print("Did not add because of better duplicate.")
-#                     else:
-#                         print("added", last_lead[0:2])
-#                         all_leads.append(parse_email_details(get_cleaned_body(i['body'])))
-#                         lead_emails_for_doubles.append(last_lead[2])
-#                         lead_type_for_doubles.append(last_lead[1])
-#             except TypeError:
-#                 print("Not all info")
-#         except ValueError:
-#             print("lead not in zone")
-#
-#     add_to_spreadsheet(all_leads)
-#
-    # html_template = """
-    #     <h1>Latest Emails from {{ label_id }}</h1>
-    #     <ul>
-    #         {% for email in emails %}
-    #             <li>
-    #                 <h3>{{ email.subject }}</h3>
-    #                 <p>{{ email.body }}</p>
-    #             </li>
-    #         {% endfor %}
-    #     </ul>
-    #     """
-    #
-    # return render_template_string(html_template, emails=emails, label_id=label_id)
 @app.route('/')
 def index():
     creds = authenticate_gmail()
