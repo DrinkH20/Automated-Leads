@@ -9,12 +9,14 @@ import os
 import pickle
 from google.auth.transport.requests import Request
 from google_auth_oauthlib.flow import InstalledAppFlow
+# Install google-api-python-client
 from googleapiclient.discovery import build
 from email.utils import formataddr
 from email.mime.multipart import MIMEMultipart
 import html
 import re
 from server_price_connect import update_servers
+import unicodedata
 
 # ot, initial, move, monthly, biweekly, weekly = 0,0,0,0,0,0
 
@@ -27,61 +29,183 @@ TOKEN_FILE = 'token.pickle'
 
 logging.basicConfig(level=logging.DEBUG)
 
+def safe_state_place(sp):
+    """Return (zone, city) from state_place, safely."""
+    zone, city = "", ""
+    if isinstance(sp, (list, tuple)):
+        if len(sp) >= 1 and sp[0]:
+            zone = sp[0]
+        if len(sp) >= 2 and sp[1]:
+            city = sp[1]
+    return zone, city
+
+def parse_lead_line(text):
+    """
+    Extract name and service_type from text like:
+      'Z., Edna wants monthly cleaning!'  -> ('Z., Edna', 'monthly')
+      'Curtin, Sara wants oneTime cleaning!' -> ('Curtin, Sara', 'oneTime')
+    Works across lines; ignores case.
+    """
+    if not text:
+        return None, None
+
+    s = unicodedata.normalize("NFKC", str(text)).replace("\xa0", " ")
+    # Collapse whitespace
+    s = re.sub(r"\s+", " ", s).strip()
+
+    m = re.search(
+        r"""(?P<name>.+?)\s+wants\s+(?P<stype>[A-Za-z\-\s]+?)\s+cleaning\b!?""",
+        s,
+        flags=re.IGNORECASE
+    )
+    if not m:
+        return None, None
+    name = m.group("name").strip()
+    stype = m.group("stype").strip()
+    return name, stype
+
+def normalize_service_type(raw):
+    s = (raw or "").strip().upper()
+    s = re.sub(r"[\s\-]", "", s)
+    aliases = {
+        "ONETIME":"ONETIME", "ONCE":"ONETIME", "ONEOFF":"ONETIME",
+        "MOVE":"MOVE","MOVEIN":"MOVE","MOVEOUT":"MOVE",
+        "WEEKLY":"WEEKLY",
+        "BIWEEKLY":"BIWEEKLY","EOW":"BIWEEKLY","EVERYOTHERWEEK":"BIWEEKLY","EVERY2WEEKS":"BIWEEKLY",
+        "MONTHLY":"MONTHLY","EVERY4WEEKS":"MONTHLY","4WEEK":"MONTHLY",
+    }
+    return aliases.get(s)
+
+def split_name(name):
+    if not name:
+        return "", ""
+    s = unicodedata.normalize("NFKC", str(name)).replace("\xa0", " ")
+    s = s.replace("，", ",").replace("‚", ",").replace("ˏ", ",")
+    s = re.sub(r"\s+", " ", s).strip()
+    if "," in s:
+        last, first = s.split(",", 1)
+        return last.strip(), first.strip()
+    parts = s.split(" ")
+    if len(parts) == 1:
+        return "", parts[0]
+    return " ".join(parts[1:]).strip(), parts[0].strip()
+
+def normalize_service_type(raw):
+    s = (raw or "").strip().upper()
+    # remove spaces and dashes for easier matching
+    s_compact = re.sub(r'[\s\-]', '', s)
+
+    # canonical options
+    valid = {"ONETIME", "MOVE", "WEEKLY", "BIWEEKLY", "MONTHLY"}
+
+    # direct match
+    if s in valid:
+        return s
+    if s_compact in valid:
+        return s_compact
+
+    # common aliases
+    aliases = {
+        "ONCE": "ONETIME",
+        "ONEOFF": "ONETIME",
+        "ONECLEAN": "ONETIME",
+        "MOVEIN": "MOVE",
+        "MOVEOUT": "MOVE",
+        "EOW": "BIWEEKLY",
+        "EVERYOTHERWEEK": "BIWEEKLY",
+        "EVERY2WEEKS": "BIWEEKLY",
+        "4WEEK": "MONTHLY",
+        "EVERY4WEEKS": "MONTHLY",
+    }
+    if s_compact in aliases:
+        return aliases[s_compact]
+
+    # heuristic: if token contains a canonical word, pick it
+    for key in ["ONETIME", "MOVE", "WEEKLY", "BIWEEKLY", "MONTHLY"]:
+        if key in s_compact:
+            return key
+
+    return None  # unknown
 
 def revise_list(data, mark, factor_dfw, dfw_count, pdx_pricing, dfw_pricing):
     print("this is the revised", mark)
 
-    revised_data = []
-    today_date = datetime.now().strftime('%#m/%#d')  # Get today's date in M/D format
-    draft_list = []
+    revised_data, draft_list = [], []
+    today_date = datetime.now().strftime('%#m/%#d')
+    scripts_choose = ["ONETIME", "MOVE", "WEEKLY", "BIWEEKLY", "MONTHLY"]
+
     count = 0
     for item in data:
-        # Extract each element from the tuple
-        state_place = item[6]
-        city = state_place[1]
-        name, service_type, email, sqft, bed, bath, zone, phone = item[0:8]
-        zone = state_place[0]
-        print(len(item))
-        if len(item) == 9:
-            utm_value = item[8]
+        # Unpack what you *know*; guard lengths
+        name         = item[0] if len(item) > 0 else None
+        service_type = item[1] if len(item) > 1 else None
+        email        = item[2] if len(item) > 2 else None
+        sqft         = item[3] if len(item) > 3 else None
+        bed          = item[4] if len(item) > 4 else None
+        bath         = item[5] if len(item) > 5 else None
+        state_place  = item[6] if len(item) > 6 else None
+        phone        = item[7] if len(item) > 7 else None
+        utm_value    = item[8] if len(item) > 8 and item[8] is not None else ""
 
-        # Prepare the revised format in columns
+        # --- NEW: if name or service_type missing, scan all string fields in *this* item only
+        if not name or not service_type:
+            for field in item:
+                if isinstance(field, str) and ("wants" in field or "WANTS" in field):
+                    n2, s2 = parse_lead_line(field)
+                    if n2 and not name:
+                        name = n2
+                    if s2 and not service_type:
+                        service_type = s2
+                    if name and service_type:
+                        break
+
+        # Derive zone/city safely
+        zone = state_place[0] if isinstance(state_place, (list, tuple)) and len(state_place) > 0 and state_place[0] else ""
+        city = state_place[1] if isinstance(state_place, (list, tuple)) and len(state_place) > 1 and state_place[1] else ""
+
+        # Normalize strings
+        name = name or ""
+        email = email or ""
+        phone = phone or ""
+        service_type = service_type or ""
+
+        # Name & service parsing
+        last_name, first_name = split_name(name)
+        stype_norm = normalize_service_type(service_type)
+        if not stype_norm:
+            # If we STILL can't normalize, default to ONETIME (or log & skip)
+            stype_norm = "ONETIME"
+        try:
+            stype_idx = scripts_choose.index(stype_norm)
+        except ValueError:
+            stype_idx = 0
+
+        # Add to sheet data
         revised_data.append((
-            today_date,
-            utm_value if utm_value else "",
-            "Auto",
-            "",
-            "emailed",
+            today_date, utm_value, "Auto", "", "emailed",
             "", "", "", "", "",
-            name if name else "",
-            service_type if service_type else "",
-            zone if zone else "",
-            email if email else "",
-            phone if phone else "",
-            "",
-            utm_value if utm_value else "",
-            city if city else ""
+            name, service_type, zone, email, phone, "",
+            utm_value, city
         ))
-        scripts_choose = ["ONETIME", "MOVE", "WEEKLY", "BIWEEKLY", "MONTHLY"]
-        if ',' in name:
-            last_name, first_name = name.split(',', 1)
-        print(service_type.upper(), scripts_choose.index(service_type.upper()))
+
+        # Compose draft using market split
         if (len(data) - count) > dfw_count:
-            sub, body_text = autocalc(sqft, bed, bath, scripts_choose.index(service_type.upper()), first_name, last_name, "Joel", city, "PDX", factor_dfw, pdx_pricing)
+            sub, body_text = autocalc(sqft, bed, bath, stype_idx, first_name, last_name,
+                                      "Joel", city, "PDX", factor_dfw, pdx_pricing)
         else:
-            sub, body_text = autocalc(sqft, bed, bath, scripts_choose.index(service_type.upper()), first_name,
-                                      last_name, "Joel", city, "DFW", factor_dfw, dfw_pricing)
+            sub, body_text = autocalc(sqft, bed, bath, stype_idx, first_name, last_name,
+                                      "Joel", city, "DFW", factor_dfw, dfw_pricing)
+
         draft_list.append((sub, body_text, email))
         count += 1
 
-    # Send drafts, labeling the last dfw_amount as DFW
+    # Send drafts
     total = len(draft_list)
     for i, (sub, body_text, email) in enumerate(draft_list):
-        is_dfw = i >= total - dfw_count
-        label_market = "DFW" if is_dfw else "PDX"
+        label_market = "DFW" if i >= total - dfw_count else "PDX"
         create_draft_route(sub, body_text, email, label_market)
-    return revised_data
 
+    return revised_data
 
 def create_label_if_not_exists(service, user_id, label_name, markt=None):
     """Creates a new label if it doesn't exist."""
