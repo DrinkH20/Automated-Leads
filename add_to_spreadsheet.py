@@ -561,7 +561,7 @@ def get_title(sqft, beds, baths, part_list, last, first):
 
 
 def get_quote(date_month, initial, recuring, part_list, name="there", username="", city=""):
-    scripts = [f"""Hi{name},
+    scripts = [f"""Hi {name},
 
 We’re excited to help make your home feel fresh and spotless!
 
@@ -571,7 +571,7 @@ Based on the info you provided and our {date_month} special, your one-time clean
 Please let me know if you would like to get on the schedule and if you have any preferred days/times. Our schedule fills up quickly, but we still have a few spots open in {date_month}!
 
 We look forward to cleaning for you!
-{username}""", f"""Hi{name},
+{username}""", f"""Hi {name},
 
 We’re excited to help make your home feel fresh and spotless!
 
@@ -581,7 +581,7 @@ Based on the info you provided and our {date_month} special, your moving clean w
 Please let me know if you would like to get on the schedule and if you have any preferred days/times. Our schedule fills up quickly, but we still have a few spots open in {date_month}!
 
 We look forward to cleaning for you!
-{username}""", f"""Hi{name}!
+{username}""", f"""Hi {name}!
 
 We’re excited to help make your home feel fresh and spotless!
 
@@ -591,7 +591,7 @@ Please let me know if you would like to get on the schedule and if you have any 
 
 We look forward to cleaning for you!
 {username}
-""", f"""Hi{name}!
+""", f"""Hi {name}!
 
 We’re excited to help make your home feel fresh and spotless!
 
@@ -601,7 +601,7 @@ Please let me know if you would like to get on the schedule and if you have any 
 
 We look forward to cleaning for you!
 {username}
-""", f"""Hi{name}!
+""", f"""Hi {name}!
 
 We’re excited to help make your home feel fresh and spotless!
 
@@ -616,7 +616,7 @@ We look forward to cleaning for you!
 
 
 def get_quote_dfw(date_month, initial, recuring, part_list, name="there", username="", city=""):
-    scripts = [f"""Hi{name},
+    scripts = [f"""Hi {name},
 
 We’re excited to help make your home feel fresh and spotless!
 
@@ -626,7 +626,7 @@ Based on the info you provided and our {date_month} special, your one-time clean
 Please let me know if you would like to get on the schedule and if you have any preferred days/times. Our schedule fills up quickly, but we still have a few spots open in {date_month}!
 
 We look forward to cleaning for you!
-{username}""", f"""Hi{name},
+{username}""", f"""Hi {name},
 
 We’re excited to help make your home feel fresh and spotless!
 
@@ -636,7 +636,7 @@ Based on the info you provided and our {date_month} special, your moving clean w
 Please let me know if you would like to get on the schedule and if you have any preferred days/times. Our schedule fills up quickly, but we still have a few spots open in {date_month}!
 
 We look forward to cleaning for you!
-{username}""", f"""Hi{name}!
+{username}""", f"""Hi {name}!
 
 We’re excited to help make your home feel fresh and spotless!
 
@@ -648,7 +648,7 @@ Please let me know if you would like to get on the schedule and if you have any 
 
 We look forward to cleaning for you!
 {username}
-""", f"""Hi{name}!
+""", f"""Hi {name}!
 
 We’re excited to help make your home feel fresh and spotless!
 
@@ -660,7 +660,7 @@ Please let me know if you would like to get on the schedule and if you have any 
 
 We look forward to cleaning for you!
 {username}
-""", f"""Hi{name}!
+""", f"""Hi {name}!
 
 We’re excited to help make your home feel fresh and spotless!
 
@@ -720,25 +720,25 @@ Thank you for reaching out!
 Based on your address it looks like {sqft} sqft, with {beds} beds and {baths} baths. If that’s correct, your one-time clean will be ${initial} with our {date_month} special. 
 
 Is this something I can get on the schedule for you?
-""", f"""Hi{name}! {username} with Clean Affinity here! 
+""", f"""Hi {name}! {username} with Clean Affinity here! 
 Thank you for reaching out! 
 
 Based on your address it looks like {sqft} sqft, with {beds} beds and {baths} baths. If that’s correct, your moving clean will be ${initial} with our {date_month} special. 
 
 Is this something I can get on the schedule for you?
-""", f"""Hi{name}! {username} with Clean Affinity here! 
+""", f"""Hi {name}! {username} with Clean Affinity here! 
 Thank you for reaching out! 
 
 Based on your address it looks like {sqft} sqft, with {beds} beds and {baths} baths. If that’s correct, your initial clean will be ${initial} and the following weekly cleans will be ${recuring} with our {date_month} special. 
 
 Is this something I can get on the schedule for you?
-""", f"""Hi{name}! {username} with Clean Affinity here! 
+""", f"""Hi {name}! {username} with Clean Affinity here! 
 Thank you for reaching out! 
 
 Based on your address it looks like {sqft} sqft, with {beds} beds and {baths} baths. If that’s correct, your initial clean will be ${initial} and the following biweekly cleans will be ${recuring} with our {date_month} special. 
 
 Is this something I can get on the schedule for you?
-""", f"""Hi{name}! {username} with Clean Affinity here! 
+""", f"""Hi {name}! {username} with Clean Affinity here! 
 Thank you for reaching out! 
 
 Based on your address it looks like {sqft} sqft, with {beds} beds and {baths} baths. If that’s correct, your initial clean will be ${initial} and the following monthly cleans will be ${recuring} with our {date_month} special. 
