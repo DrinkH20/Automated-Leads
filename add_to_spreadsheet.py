@@ -445,7 +445,7 @@ def calc_sqft_price(sqft):
         elif sqft < 4200:
             sqft_price = 160
         elif sqft < 10500:
-            sqft_price = 250
+            sqft_price = sqft * 0.05
     except ValueError and UnboundLocalError and IndexError and UnboundLocalError:
         print("Error Loading Quote")
     return sqft_price
