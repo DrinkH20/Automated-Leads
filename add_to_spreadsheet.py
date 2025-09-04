@@ -471,32 +471,39 @@ def autocalc(sqft, beds, baths, type_clean, name_first, name_last, username, cit
         except ValueError:
             print("Error Loading Quote")
 
-        # ["ONETIME", "MOVE", "WEEKLY", "BIWEEKLY", "MONTHLY"]
-        dfw_type_clean = type_clean
-        if type_clean == 0:
-            elite = before_price * ot
-        if type_clean == 1:
-            elite = before_price * move
-        if type_clean == 2:
-            ongoing = before_price * weekly
-        if type_clean == 3:
-            ongoing = before_price * biweekly
-        if type_clean == 4:
-            ongoing = before_price * monthly
-        if dfw_type_clean >= 1:
-            dfw_type_clean += 1
+            # ["ONETIME", "MOVE", "WEEKLY", "BIWEEKLY", "MONTHLY"]
+            dfw_type_clean = type_clean
+            if type_clean == 0:
+                elite = before_price * ot
+            if type_clean == 1:
+                elite = before_price * move
+            if type_clean == 2:
+                ongoing = before_price * weekly
+            if type_clean == 3:
+                ongoing = before_price * biweekly
+            if type_clean == 4:
+                if market == "DFW" and before_price < 109:
+                    ongoing = 109 * monthly
+                else:
+                    ongoing = before_price * monthly
 
-        # Order of cleanings is switched on the estimator to go OT initial move monthly biweekly week. So i swap the weekly and monthly numbers
-        if dfw_type_clean == 3:
-            dfw_type_clean = 5
-        elif dfw_type_clean == 5:
-            dfw_type_clean = 3
+            if dfw_type_clean >= 1:
+                dfw_type_clean += 1
 
+            # Order of cleanings is switched on the estimator to go OT initial move monthly biweekly week. So i swap the weekly and monthly numbers
+            if dfw_type_clean == 3:
+                dfw_type_clean = 5
+            elif dfw_type_clean == 5:
+                dfw_type_clean = 3
 
-        if type_clean == 2 or type_clean == 3 or type_clean == 4:
-            elite = before_price * initial
-            if ongoing < 140:
-                ongoing = 140
+            if type_clean == 2 or type_clean == 3 or type_clean == 4:
+                elite = before_price * initial
+                if ongoing < 140:
+                    if dfw_type_clean == 3 and market == "DFW":
+                        if ongoing < 109:
+                            ongoing = 109
+                    else:
+                        ongoing = 140
 
         # DFW type is 6 when you select far
         if market == "DFW" and dfw_type_clean != 6:
