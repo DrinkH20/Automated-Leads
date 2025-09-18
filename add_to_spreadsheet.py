@@ -631,7 +631,10 @@ We’re excited to help make your home feel fresh and spotless!
 Based on the info you provided and our {date_month} special, your one-time clean will be ${initial} (Includes washing all interior window panes within arms reach!)
 •	        Would you like any extras like fridge, oven, window blind or track cleaning?
 •	        Are there any other cleaning needs/notes you would like for me to add to our list?
-Please let me know if you would like to get on the schedule and if you have any preferred days/times. Our schedule fills up quickly, but we still have a few spots open in {date_month}!
+
+Every technician on our team is carefully chosen, background-checked, highly trained, and IICRC-certified—so you can count on professionalism and care with every visit.
+
+Let me know if you would like to get on the schedule and if you have any preferred days/times. Our schedule fills up quickly (especially for the longer initial clean!), but we still have a few spots in {date_month}! What works best?
 
 We look forward to cleaning for you!
 {username}""", f"""Hi {name},
@@ -641,7 +644,11 @@ We’re excited to help make your home feel fresh and spotless!
 Based on the info you provided and our {date_month} special, your moving clean will be ${initial} (Includes washing all interior window panes within arms reach!)
 •	        Would you like any extras like fridge, oven, window blind or track cleaning?
 •	        Are there any other cleaning needs/notes you would like for me to add to our list?
-Please let me know if you would like to get on the schedule and if you have any preferred days/times. Our schedule fills up quickly, but we still have a few spots open in {date_month}!
+
+Every technician on our team is carefully chosen, background-checked, highly trained, and IICRC-certified—so you can count on professionalism and care with every visit.
+
+Let me know if you would like to get on the schedule and if you have any preferred days/times. Our schedule fills up quickly (especially for the longer initial clean!), but we still have a few spots in {date_month}! What works best?
+
 
 We look forward to cleaning for you!
 {username}""", f"""Hi {name}!
@@ -650,9 +657,9 @@ We’re excited to help make your home feel fresh and spotless!
 
 Based on the info provided, and a special we are running for {date_month}, your initial reset clean will be 50% off at ${initial} (this clean will be 2-3x as long and includes washing all interior window panes within arms reach) and weekly service is ${recuring}.
 
-LOVE THE CLEAN OR IT’S FREE! — That’s our promise. We back every clean with a 100% Satisfaction Guarantee. If you’re not totally happy, we’ll re-clean for free. Still not feeling it? We’ll refund your clean in full.
+Every technician on our team is carefully chosen, background-checked, highly trained, and IICRC-certified—so you can count on professionalism and care with every visit.
 
-Please let me know if you would like to get on the schedule and if you have any preferred days/times. Our schedule fills up quickly (especially for the longer initial clean!), but we still have a few spots in {date_month}! What works best?
+Let me know if you would like to get on the schedule and if you have any preferred days/times. Our schedule fills up quickly (especially for the longer initial clean!), but we still have a few spots in {date_month}! What works best?
 
 We look forward to cleaning for you!
 {username}
@@ -662,9 +669,9 @@ We’re excited to help make your home feel fresh and spotless!
 
 Based on the info provided, and a special we are running for {date_month}, your initial reset clean will be 50% off at ${initial} (this clean will be 2-3x as long and includes washing all interior window panes within arms reach) and biweekly service is ${recuring}.
 
-LOVE THE CLEAN OR IT’S FREE! — That’s our promise. We back every clean with a 100% Satisfaction Guarantee. If you’re not totally happy, we’ll re-clean for free. Still not feeling it? We’ll refund your clean in full.
+Every technician on our team is carefully chosen, background-checked, highly trained, and IICRC-certified—so you can count on professionalism and care with every visit.
 
-Please let me know if you would like to get on the schedule and if you have any preferred days/times. Our schedule fills up quickly (especially for the longer initial clean!), but we still have a few spots in {date_month}! What works best?
+Let me know if you would like to get on the schedule and if you have any preferred days/times. Our schedule fills up quickly (especially for the longer initial clean!), but we still have a few spots in {date_month}! What works best?
 
 We look forward to cleaning for you!
 {username}
@@ -674,13 +681,21 @@ We’re excited to help make your home feel fresh and spotless!
 
 Based on the info provided, and a special we are running for {date_month}, your initial reset clean will be 50% off at ${initial} (this clean will be 2-3x as long and includes washing all interior window panes within arms reach) and monthly service is ${recuring}.
 
-LOVE THE CLEAN OR IT’S FREE! — That’s our promise. We back every clean with a 100% Satisfaction Guarantee. If you’re not totally happy, we’ll re-clean for free. Still not feeling it? We’ll refund your clean in full.
+Every technician on our team is carefully chosen, background-checked, highly trained, and IICRC-certified—so you can count on professionalism and care with every visit.
 
-Please let me know if you would like to get on the schedule and if you have any preferred days/times. Our schedule fills up quickly (especially for the longer initial clean!), but we still have a few spots in {date_month}! What works best?
+Let me know if you would like to get on the schedule and if you have any preferred days/times. Our schedule fills up quickly (especially for the longer initial clean!), but we still have a few spots in {date_month}! What works best?
 
-We look forward to cleaning for you
+We look forward to cleaning for you!
 {username}
-"""]
+""", f"""Hi {name},
+
+Thank you for reaching out about cleans! We'd love to help!
+
+It looks like the address you provided is in Salem which is outside of our service area. Do you have an address that is closer to the Portland Metro area? Let me know and we'd love to help you with your cleaning needs!
+
+Best,
+
+{username}"""]
     return scripts[part_list]
 
 
