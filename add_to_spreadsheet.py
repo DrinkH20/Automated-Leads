@@ -509,13 +509,30 @@ def autocalc(sqft, beds, baths, type_clean, name_first, name_last, username, cit
         if market == "DFW" and dfw_type_clean != 6:
             ongoing = ongoing * texas_factors[dfw_type_clean]
 
-        if type_clean != 1 and type_clean != 0:
-
-            if elite < 200:
-                elite = 200
+        if market != "DFW":
+            if type_clean != 1 and type_clean != 0:
+                if elite < 200:
+                    elite = 200
+            else:
+                if elite < 250:
+                    elite = 250
         else:
-            if elite < 250:
-                elite = 250
+            if type_clean != 1:
+                if type_clean != 0:
+                    if elite < 150:
+                        elite = 150
+                else:
+                    if elite > 273:
+                        elite += 100
+                    elif elite < 150:
+                        elite = 150
+            else:
+                if type_clean != 0:
+                    if elite > 300:
+                        elite += 100
+                if elite < 250:
+                    elite = 250
+
         print(before_price, elite, "moving factor", move, texas_factors[dfw_type_clean], texas_factors)
 
         title = get_title(sqft, beds, baths, type_clean, name_last, name_first)
