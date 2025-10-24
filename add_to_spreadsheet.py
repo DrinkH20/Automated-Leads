@@ -610,19 +610,10 @@ We look forward to cleaning for you!
 
 We’re excited to help make your home feel fresh and spotless!
 
-Based on the info provided, and a special we are running for {date_month}, your initial reset clean will be 50% off at ${initial} (this clean will be 2-3x as long and includes washing all interior window panes within arms reach) and weekly service is ${recuring}.
+Normally, your initial reset clean would be ${initial*2},
+but with our {date_month} special, it’s 50% off — just ${initial}. Your weekly service is ${recuring}, with the whole home cleaned every visit.
 
-Please let me know if you would like to get on the schedule and if you have any preferred days/times. Our schedule fills up quickly (especially for the longer initial clean!), but we still have a few spots in {date_month}! What works best?
-
-We look forward to cleaning for you!
-{username}
-""", f"""Hi {name}!
-
-We’re excited to help make your home feel fresh and spotless!
-
-Based on the info provided, and a special we are running for {date_month}, your initial reset clean will be 50% off at ${initial} (this clean will be 2-3x as long and includes washing all interior window panes within arms reach) and biweekly service is ${recuring}.
-
-Please let me know if you would like to get on the schedule and if you have any preferred days/times. Our schedule fills up quickly (especially for the longer initial clean!), but we still have a few spots in {date_month}! What works best?
+Let me know if you’d like to get on the schedule and if you have any preferred days or times. Our calendar fills up quickly (especially for the longer initial clean), but we still have a few {date_month} spots available. What works best for you?
 
 We look forward to cleaning for you!
 {username}
@@ -630,13 +621,33 @@ We look forward to cleaning for you!
 
 We’re excited to help make your home feel fresh and spotless!
 
-Based on the info provided, and a special we are running for {date_month}, your initial reset clean will be 50% off at ${initial} (this clean will be 2-3x as long and includes washing all interior window panes within arms reach) and monthly service is ${recuring}.
+Normally, your initial reset clean would be ${initial*2},
+but with our {date_month} special, it’s 50% off — just ${initial}. Your biweekly service is ${recuring}, with the whole home cleaned every visit.
 
-Please let me know if you would like to get on the schedule and if you have any preferred days/times. Our schedule fills up quickly (especially for the longer initial clean!), but we still have a few spots in {date_month}! What works best?
+Let me know if you’d like to get on the schedule and if you have any preferred days or times. Our calendar fills up quickly (especially for the longer initial clean), but we still have a few {date_month} spots available. What works best for you?
 
 We look forward to cleaning for you!
 {username}
-"""]
+""", f"""Hi {name}!
+
+We’re excited to help make your home feel fresh and spotless!
+
+Normally, your initial reset clean would be ${initial*2},
+but with our {date_month} special, it’s 50% off — just ${initial}. Your monthly service is ${recuring}, with the whole home cleaned every visit.
+
+Let me know if you’d like to get on the schedule and if you have any preferred days or times. Our calendar fills up quickly (especially for the longer initial clean), but we still have a few {date_month} spots available. What works best for you?
+
+We look forward to cleaning for you!
+{username}
+""", f"""Hi {name},
+
+Thank you for reaching out about cleans! We'd love to help!
+
+It looks like the address you provided is in Salem which is outside of our service area. Do you have an address that is closer to the Portland Metro area? Let me know and we'd love to help you with your cleaning needs!
+
+Best,
+
+{username}"""]
     return scripts[part_list]
 
 
@@ -645,7 +656,7 @@ def get_quote_dfw(date_month, initial, recuring, part_list, name="there", userna
     
 We’re excited to help make your home feel fresh and spotless!
 
-Based on the info you provided and our {date_month} special, your one-time clean will be ${initial} before tax (Includes washing all interior window panes within arms reach!)
+Based on the info you provided and our {date_month} special, your one-time clean will be ${initial} before sales tax (Includes washing all interior window panes within arms reach!)
 
 •         Would you like any extras like fridge, oven, window blind or track cleaning?
 
@@ -659,7 +670,7 @@ We look forward to cleaning for you!
 {username}""", f"""Hi {name},
     
 We’re excited to help make your home feel fresh and spotless!
-Based on the info you provided and our {date_month} special, your moving clean will be ${initial} before tax (Includes washing all interior window panes within arms reach!)
+Based on the info you provided and our {date_month} special, your moving clean will be ${initial} before sales tax (Includes washing all interior window panes within arms reach!)
 
 •         Would you like any extras like fridge, oven, window blind or track cleaning?
 
@@ -674,11 +685,12 @@ We look forward to cleaning for you!
 
 We’re excited to help make your home feel fresh and spotless!
 
-Based on the info provided, and a special we are running for {date_month}, your initial reset clean will be 50% off at ${initial} before tax (this clean will be 2-3x as long and includes washing all interior window panes within arms reach) and weekly service is ${recuring} before tax.
+Normally, your initial reset clean would be ${initial*2},
+but with our {date_month} special, it’s 50% off — ${initial} before sales tax. Your weekly service is ${recuring} before sales tax, with the whole home cleaned every visit.
 
 Every technician on our team is background-checked, highly trained, and IICRC-certified, with great communication skills — so you can count on professionalism and care with every visit.
 
-Let me know if you would like to get on the schedule and if you have any preferred days/times. Our schedule fills up quickly (especially for the longer initial clean!), but we still have a few spots in October! What works best?
+Let me know if you’d like to get on the schedule and if you have any preferred days/times. Our schedule fills up quickly (especially for the longer initial clean!), but we still have a few {date_month} spots available. What works best?
 
 We look forward to cleaning for you!
 {username} 
@@ -686,26 +698,28 @@ We look forward to cleaning for you!
 
 We’re excited to help make your home feel fresh and spotless!
 
-Based on the info provided, and a special we are running for {date_month}, your initial reset clean will be 50% off at ${initial} before tax (this clean will be 2-3x as long and includes washing all interior window panes within arms reach) and biweekly service is ${recuring} before tax.
+Normally, your initial reset clean would be ${initial*2},
+but with our {date_month} special, it’s 50% off — ${initial} before sales tax. Your biweekly service is ${recuring} before sales tax, with the whole home cleaned every visit.
 
 Every technician on our team is background-checked, highly trained, and IICRC-certified, with great communication skills — so you can count on professionalism and care with every visit.
 
-Let me know if you would like to get on the schedule and if you have any preferred days/times. Our schedule fills up quickly (especially for the longer initial clean!), but we still have a few spots in October! What works best?
+Let me know if you’d like to get on the schedule and if you have any preferred days/times. Our schedule fills up quickly (especially for the longer initial clean!), but we still have a few {date_month} spots available. What works best?
 
 We look forward to cleaning for you!
-{username} 
+{username}  
 """, f"""Hi {name}!
 
 We’re excited to help make your home feel fresh and spotless!
 
-Based on the info provided, and a special we are running for {date_month}, your initial reset clean will be 50% off at ${initial} before tax (this clean will be 2-3x as long and includes washing all interior window panes within arms reach) and monthly service is ${recuring} before tax.
+Normally, your initial reset clean would be ${initial*2},
+but with our {date_month} special, it’s 50% off — ${initial} before sales tax. Your monthly service is ${recuring} before sales tax, with the whole home cleaned every visit.
 
 Every technician on our team is background-checked, highly trained, and IICRC-certified, with great communication skills — so you can count on professionalism and care with every visit.
 
-Let me know if you would like to get on the schedule and if you have any preferred days/times. Our schedule fills up quickly (especially for the longer initial clean!), but we still have a few spots in October! What works best?
+Let me know if you’d like to get on the schedule and if you have any preferred days/times. Our schedule fills up quickly (especially for the longer initial clean!), but we still have a few {date_month} spots available. What works best?
 
 We look forward to cleaning for you!
-{username} 
+{username}  
 """, f"""Hi {name},
 
 Thank you for reaching out about cleans! We'd love to help!
