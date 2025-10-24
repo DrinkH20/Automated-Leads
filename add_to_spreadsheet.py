@@ -642,68 +642,70 @@ We look forward to cleaning for you!
 
 def get_quote_dfw(date_month, initial, recuring, part_list, name="there", username="", city=""):
     scripts = [f"""Hi {name},
-
+    
 We’re excited to help make your home feel fresh and spotless!
 
-Based on the info you provided and our {date_month} special, your one-time clean will be ${initial} (Includes washing all interior window panes within arms reach!)
-•	        Would you like any extras like fridge, oven, window blind or track cleaning?
-•	        Are there any other cleaning needs/notes you would like for me to add to our list?
+Based on the info you provided and our {date_month} special, your one-time clean will be ${initial} before tax (Includes washing all interior window panes within arms reach!)
 
-Every technician on our team is carefully chosen, background-checked, highly trained, and IICRC-certified—so you can count on professionalism and care with every visit.
+•         Would you like any extras like fridge, oven, window blind or track cleaning?
 
-Let me know if you would like to get on the schedule and if you have any preferred days/times. Our schedule fills up quickly (especially for the longer initial clean!), but we still have a few spots in {date_month}! What works best?
+•         Are there any other cleaning needs/notes you would like for me to add to our list?
+
+Every technician on our team is background-checked, highly trained, and IICRC-certified, with great communication skills — so you can count on professionalism and care with every visit.
+
+Let me know if you would like to get on the schedule and if you have any preferred days/times. Our schedule fills up quickly (especially for the longer initial clean!), but we still have a few spots in October! What works best?
 
 We look forward to cleaning for you!
 {username}""", f"""Hi {name},
-
+    
 We’re excited to help make your home feel fresh and spotless!
+Based on the info you provided and our {date_month} special, your moving clean will be ${initial} before tax (Includes washing all interior window panes within arms reach!)
 
-Based on the info you provided and our {date_month} special, your moving clean will be ${initial} (Includes washing all interior window panes within arms reach!)
-•	        Would you like any extras like fridge, oven, window blind or track cleaning?
-•	        Are there any other cleaning needs/notes you would like for me to add to our list?
+•         Would you like any extras like fridge, oven, window blind or track cleaning?
 
-Every technician on our team is carefully chosen, background-checked, highly trained, and IICRC-certified—so you can count on professionalism and care with every visit.
+•         Are there any other cleaning needs/notes you would like for me to add to our list?
 
-Let me know if you would like to get on the schedule and if you have any preferred days/times. Our schedule fills up quickly (especially for the longer initial clean!), but we still have a few spots in {date_month}! What works best?
+Every technician on our team is background-checked, highly trained, and IICRC-certified, with great communication skills — so you can count on professionalism and care with every visit.
 
+Let me know if you would like to get on the schedule and if you have any preferred days/times. Our schedule fills up quickly (especially for the longer initial clean!), but we still have a few spots in October! What works best?
 
 We look forward to cleaning for you!
 {username}""", f"""Hi {name}!
 
 We’re excited to help make your home feel fresh and spotless!
 
-Based on the info provided, and a special we are running for {date_month}, your initial reset clean will be 50% off at ${initial} (this clean will be 2-3x as long and includes washing all interior window panes within arms reach) and weekly service is ${recuring}.
+Based on the info provided, and a special we are running for {date_month}, your initial reset clean will be 50% off at ${initial} before tax (this clean will be 2-3x as long and includes washing all interior window panes within arms reach) and weekly service is ${recuring} before tax.
 
-Every technician on our team is carefully chosen, background-checked, highly trained, and IICRC-certified—so you can count on professionalism and care with every visit.
+Every technician on our team is background-checked, highly trained, and IICRC-certified, with great communication skills — so you can count on professionalism and care with every visit.
 
-Let me know if you would like to get on the schedule and if you have any preferred days/times. Our schedule fills up quickly (especially for the longer initial clean!), but we still have a few spots in {date_month}! What works best?
+Let me know if you would like to get on the schedule and if you have any preferred days/times. Our schedule fills up quickly (especially for the longer initial clean!), but we still have a few spots in October! What works best?
 
 We look forward to cleaning for you!
-{username}
+{username} 
 """, f"""Hi {name}!
 
 We’re excited to help make your home feel fresh and spotless!
 
-Based on the info provided, and a special we are running for {date_month}, your initial reset clean will be 50% off at ${initial} (this clean will be 2-3x as long and includes washing all interior window panes within arms reach) and biweekly service is ${recuring}.
+Based on the info provided, and a special we are running for {date_month}, your initial reset clean will be 50% off at ${initial} before tax (this clean will be 2-3x as long and includes washing all interior window panes within arms reach) and biweekly service is ${recuring} before tax.
 
-Every technician on our team is carefully chosen, background-checked, highly trained, and IICRC-certified—so you can count on professionalism and care with every visit.
+Every technician on our team is background-checked, highly trained, and IICRC-certified, with great communication skills — so you can count on professionalism and care with every visit.
 
-Let me know if you would like to get on the schedule and if you have any preferred days/times. Our schedule fills up quickly (especially for the longer initial clean!), but we still have a few spots in {date_month}! What works best?
+Let me know if you would like to get on the schedule and if you have any preferred days/times. Our schedule fills up quickly (especially for the longer initial clean!), but we still have a few spots in October! What works best?
 
 We look forward to cleaning for you!
-{username}
+{username} 
 """, f"""Hi {name}!
 
 We’re excited to help make your home feel fresh and spotless!
 
-Based on the info provided, and a special we are running for {date_month}, your initial reset clean will be 50% off at ${initial} (this clean will be 2-3x as long and includes washing all interior window panes within arms reach) and monthly service is ${recuring}.
+Based on the info provided, and a special we are running for {date_month}, your initial reset clean will be 50% off at ${initial} before tax (this clean will be 2-3x as long and includes washing all interior window panes within arms reach) and monthly service is ${recuring} before tax.
 
-Every technician on our team is carefully chosen, background-checked, highly trained, and IICRC-certified—so you can count on professionalism and care with every visit.
+Every technician on our team is background-checked, highly trained, and IICRC-certified, with great communication skills — so you can count on professionalism and care with every visit.
 
-Let me know if you would like to get on the schedule and if you have any preferred days/times. Our schedule fills up quickly (especially for the longer initial clean!), but we still have a few spots in {date_month}! What works best?
+Let me know if you would like to get on the schedule and if you have any preferred days/times. Our schedule fills up quickly (especially for the longer initial clean!), but we still have a few spots in October! What works best?
 
 We look forward to cleaning for you!
-{username}
+{username} 
 """, f"""Hi {name},
 
 Thank you for reaching out about cleans! We'd love to help!
