@@ -86,7 +86,7 @@ def get_zone(address, mrkt, api_key=""):
             with open('zones_output.json', 'r') as f:
                 zones = json.load(f)
         else:
-            with open('dfwzones_converted.json', 'r') as f:
+            with open('dfw_zones_output.json', 'r') as f:
                 zones = json.load(f)
 
         latitude, longitude = 0, 0
