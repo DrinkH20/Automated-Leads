@@ -79,11 +79,11 @@ def is_point_in_zone(zones, lat, lon):
             return zone['name']
     return None
 
-def get_zone(address, mrkt, api_key="AIzaSyAzF17u53V310uHFnD0RoCxabjlV0wLYjQ"):
+def get_zone(address, mrkt, api_key=""):
     city = "city"
     if address:
         if mrkt == "PDX":
-            with open('zones.json', 'r') as f:
+            with open('zones_output.json', 'r') as f:
                 zones = json.load(f)
         else:
             with open('dfwzones_converted.json', 'r') as f:
