@@ -685,8 +685,7 @@ We look forward to cleaning for you!
 
 We’re excited to help make your home feel fresh and spotless!
 
-Normally, your initial reset clean would be ${initial*2},
-but with our {date_month} special, it’s 50% off — ${initial} before sales tax. Your weekly service is ${recuring} before sales tax, with the whole home cleaned every visit.
+Normally, your initial reset clean would be ${initial*2}, but with our {date_month} special, it’s 50% off — ${initial} before sales tax. Your weekly service is ${recuring} before sales tax, with the whole home cleaned every visit.
 
 Every technician on our team is background-checked, highly trained, and IICRC-certified, with great communication skills — so you can count on professionalism and care with every visit.
 
@@ -698,8 +697,7 @@ We look forward to cleaning for you!
 
 We’re excited to help make your home feel fresh and spotless!
 
-Normally, your initial reset clean would be ${initial*2},
-but with our {date_month} special, it’s 50% off — ${initial} before sales tax. Your biweekly service is ${recuring} before sales tax, with the whole home cleaned every visit.
+Normally, your initial reset clean would be ${initial*2}, but with our {date_month} special, it’s 50% off — ${initial} before sales tax. Your biweekly service is ${recuring} before sales tax, with the whole home cleaned every visit.
 
 Every technician on our team is background-checked, highly trained, and IICRC-certified, with great communication skills — so you can count on professionalism and care with every visit.
 
@@ -711,8 +709,7 @@ We look forward to cleaning for you!
 
 We’re excited to help make your home feel fresh and spotless!
 
-Normally, your initial reset clean would be ${initial*2},
-but with our {date_month} special, it’s 50% off — ${initial} before sales tax. Your monthly service is ${recuring} before sales tax, with the whole home cleaned every visit.
+Normally, your initial reset clean would be ${initial*2}, but with our {date_month} special, it’s 50% off — ${initial} before sales tax. Your monthly service is ${recuring} before sales tax, with the whole home cleaned every visit.
 
 Every technician on our team is background-checked, highly trained, and IICRC-certified, with great communication skills — so you can count on professionalism and care with every visit.
 
