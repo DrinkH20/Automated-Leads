@@ -664,7 +664,7 @@ Based on the info you provided and our {date_month} special, your one-time clean
 
 Every technician on our team is background-checked, highly trained, and IICRC-certified, with great communication skills — so you can count on professionalism and care with every visit.
 
-Let me know if you would like to get on the schedule and if you have any preferred days/times. Our schedule fills up quickly (especially for the longer initial clean!), but we still have a few spots in October! What works best?
+Let me know if you would like to get on the schedule and if you have any preferred days/times. Our schedule fills up quickly (especially for the longer initial clean!), but we still have a few spots in {date_month}! What works best?
 
 We look forward to cleaning for you!
 {username}""", f"""Hi {name},
@@ -678,44 +678,44 @@ Based on the info you provided and our {date_month} special, your moving clean w
 
 Every technician on our team is background-checked, highly trained, and IICRC-certified, with great communication skills — so you can count on professionalism and care with every visit.
 
-Let me know if you would like to get on the schedule and if you have any preferred days/times. Our schedule fills up quickly (especially for the longer initial clean!), but we still have a few spots in October! What works best?
+Let me know if you would like to get on the schedule and if you have any preferred days/times. Our schedule fills up quickly (especially for the longer initial clean!), but we still have a few spots in {date_month}! What works best?
 
 We look forward to cleaning for you!
-{username}""", f"""Hi {name}!
+{username}""", f"""Hi {name},
 
-We’re excited to help make your home feel fresh and spotless!
+We’d love to help get your home fresh and spotless!
 
-Normally, your initial reset clean would be ${initial*2}, but with our {date_month} special, it’s 50% off — ${initial} before sales tax. Your weekly service is ${recuring} before sales tax, with the whole home cleaned every visit.
+With the special we are running for {date_month}, your first clean is ${recuring} before sales tax — the same rate as your weekly visits moving forward, with baseboards and interior windows included!
 
-Every technician on our team is background-checked, highly trained, and IICRC-certified, with great communication skills — so you can count on professionalism and care with every visit.
+All of our technicians are background-checked, highly trained, and IICRC-certified.
 
-Let me know if you’d like to get on the schedule and if you have any preferred days/times. Our schedule fills up quickly (especially for the longer initial clean!), but we still have a few {date_month} spots available. What works best?
+{date_month} availability is limited — would you like me to hold an opening for you?
 
-We look forward to cleaning for you!
-{username} 
-""", f"""Hi {name}!
-
-We’re excited to help make your home feel fresh and spotless!
-
-Normally, your initial reset clean would be ${initial*2}, but with our {date_month} special, it’s 50% off — ${initial} before sales tax. Your biweekly service is ${recuring} before sales tax, with the whole home cleaned every visit.
-
-Every technician on our team is background-checked, highly trained, and IICRC-certified, with great communication skills — so you can count on professionalism and care with every visit.
-
-Let me know if you’d like to get on the schedule and if you have any preferred days/times. Our schedule fills up quickly (especially for the longer initial clean!), but we still have a few {date_month} spots available. What works best?
-
-We look forward to cleaning for you!
+Best,
 {username}  
-""", f"""Hi {name}!
+""", f"""Hi {name},
 
-We’re excited to help make your home feel fresh and spotless!
+We’d love to help get your home fresh and spotless!
 
-Normally, your initial reset clean would be ${initial*2}, but with our {date_month} special, it’s 50% off — ${initial} before sales tax. Your monthly service is ${recuring} before sales tax, with the whole home cleaned every visit.
+With the special we are running for {date_month}, your first clean is ${recuring} before sales tax — the same rate as your biweekly visits moving forward, with baseboards and interior windows included!
 
-Every technician on our team is background-checked, highly trained, and IICRC-certified, with great communication skills — so you can count on professionalism and care with every visit.
+All of our technicians are background-checked, highly trained, and IICRC-certified.
 
-Let me know if you’d like to get on the schedule and if you have any preferred days/times. Our schedule fills up quickly (especially for the longer initial clean!), but we still have a few {date_month} spots available. What works best?
+{date_month} availability is limited — would you like me to hold an opening for you?
 
-We look forward to cleaning for you!
+Best,
+{username} 
+""", f"""Hi {name},
+
+We’d love to help get your home fresh and spotless!
+
+With the special we are running for {date_month}, your first clean is ${recuring} before sales tax — the same rate as your monthly visits moving forward, with baseboards and interior windows included!
+
+All of our technicians are background-checked, highly trained, and IICRC-certified.
+
+{date_month} availability is limited — would you like me to hold an opening for you?
+
+Best,
 {username}  
 """, f"""Hi {name},
 
