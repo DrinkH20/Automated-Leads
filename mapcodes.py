@@ -29,23 +29,39 @@ def get_city_from_coordinates_google(latitude, longitude):
     return "Unknown location"
 
 
+# def geocode_address_google(address, api_key):
+#     geolocator = GoogleV3(api_key=api_key)
+#     location = geolocator.geocode(address)
+#     print(location, "this is the full addy")
+#     if location:
+#         city = get_city_from_coordinates_google(location.latitude, location.longitude)
+#         print(city, "THIS IS THE ADDY")
+#         return location.latitude, location.longitude, city
+#     else:
+#         return None
 def geocode_address_google(address, api_key):
     geolocator = GoogleV3(api_key=api_key)
-    location = geolocator.geocode(address)
+
+    # Append "USA" to give geocoder proper context
+    location = geolocator.geocode(f"{address}, USA")
+
+    # print(location, "this is the full addy")
+
     if location:
         city = get_city_from_coordinates_google(location.latitude, location.longitude)
-        print(city, "THIS IS THE ADDY")
+        # print(city, "THIS IS THE ADDY")
         return location.latitude, location.longitude, city
     else:
         return None
 
 
-# Next step
+# Next steps
 def geocode_address(address):
     geolocator = Nominatim(user_agent="geoapiExercises")
     location = geolocator.geocode(address)
+    print(location, "whole location")
     if location:
-        print(get_city_from_coordinates_google(location.latitude, location.longitude), "THIS IS THE ADDY")
+        # print(get_city_from_coordinates_google(location.latitude, location.longitude), "THIS IS THE ADDY")
         return location.latitude, location.longitude
     else:
         return None
@@ -86,7 +102,7 @@ def get_zone(address, mrkt, api_key=""):
             with open('zones_output.json', 'r') as f:
                 zones = json.load(f)
         else:
-            with open('dfw_zones_output.json', 'r') as f:
+            with open('dfw_zones_output1.json', 'r') as f:
                 zones = json.load(f)
 
         latitude, longitude = 0, 0
