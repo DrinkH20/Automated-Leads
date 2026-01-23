@@ -17,6 +17,7 @@ import html
 import re
 from server_price_connect import update_servers
 import unicodedata
+from quoting import batch_get_quotes
 
 # ot, initial, move, monthly, biweekly, weekly = 0,0,0,0,0,0
 
@@ -127,14 +128,16 @@ def normalize_service_type(raw):
 
     return None  # unknown
 
-def revise_list(data, mark, factor_dfw, dfw_count, pdx_pricing, dfw_pricing):
-    print("this is the revised", mark)
+def revise_list(data, mark, dfw_count, pdx_pricing, dfw_pricing):
 
     revised_data, draft_list = [], []
     today_date = datetime.now().strftime('%#m/%#d')
     scripts_choose = ["ONETIME", "MOVE", "WEEKLY", "BIWEEKLY", "MONTHLY"]
 
     count = 0
+    quotes_to_run_pdx = []
+    quotes_to_run_dfw = []
+    quotes_to_run_phx = []
     for item in data:
         # Unpack what you *know*; guard lengths
         name         = item[0] if len(item) > 0 else None
@@ -190,14 +193,110 @@ def revise_list(data, mark, factor_dfw, dfw_count, pdx_pricing, dfw_pricing):
 
         # Compose draft using market split
         if (len(data) - count) > dfw_count:
-            sub, body_text = autocalc(sqft, bed, bath, stype_idx, first_name, last_name,
-                                      "Joel", city, "PDX", factor_dfw, pdx_pricing)
+            quotes_to_run_dfw.append(((sqft, bed, bath), stype_idx, first_name, last_name,
+                                      "Joel", city, "PDX"))
+            count += 1
+            # sub, body_text = autocalc(sqft, bed, bath, stype_idx, first_name, last_name,
+            #                           "Joel", city, "PDX", factor_dfw, pdx_pricing)
         else:
-            sub, body_text = autocalc(sqft, bed, bath, stype_idx, first_name, last_name,
-                                      "Joel", city, "DFW", factor_dfw, dfw_pricing)
+            quotes_to_run_pdx.append(((sqft, bed, bath), stype_idx, first_name, last_name,
+                                 "Joel", city, "DFW"))
+            count += 1
 
-        draft_list.append((sub, body_text, email))
-        count += 1
+    quotes_to_run = (quotes_to_run_dfw, quotes_to_run_pdx)
+
+    all_results_quotes = []
+    for market_batch in quotes_to_run:
+
+        # Market is consistent inside each sublist, so grab it from the first record
+        market = market_batch[0][6].lower()
+
+        formatted_quotes = []
+
+        for quote in market_batch:
+            sqft, beds, baths = quote[0]
+
+            formatted_quotes.append({
+                "sqft": int(float(sqft)),
+                "beds": int(float(beds)),
+                "baths": float(baths)
+            })
+
+        # Run one call per market
+        results = batch_get_quotes(market, formatted_quotes)
+
+        all_results_quotes.append({
+            "market": market,
+            "input": formatted_quotes,
+            "results": results
+        })
+
+    final_outputs = []
+
+    for market_index, market_batch in enumerate(quotes_to_run):
+
+        market_results = all_results_quotes[market_index]
+
+        market = market_results["market"].upper()  # "DFW" or "PDX"
+
+        quotes = market_batch
+        results = market_results["results"]
+
+        # Safety check — this prevents silent misalignment
+        if len(quotes) != len(results):
+            raise ValueError(f"Mismatch in {market}: {len(quotes)} quotes vs {len(results)} results")
+
+        # Walk quote-by-quote
+        for quote, result in zip(quotes, results):
+            # Unpack original quote
+            (sqft, bed, bath) = quote[0]
+            stype_idx = quote[1]
+            first_name = quote[2]
+            last_name = quote[3]
+            username = quote[4]
+            city = quote[5]
+            market = quote[6]  # keep original casing if you want
+
+            # Pricing output for this quote
+            pricing = result["output"]  # list of Decimals
+
+            # Call autocalc ONE quote at a time
+            sub, body_text = autocalc(
+                int(float(sqft)),
+                int(float(bed)),
+                float(bath),
+                stype_idx,
+                first_name,
+                last_name,
+                username,
+                city,
+                market,
+                pricing  # ← if your autocalc needs the pricing array
+            )
+            draft_list.append((sub, body_text, email))
+
+            final_outputs.append({
+                "name": f"{first_name} {last_name}",
+                "city": city,
+                "market": market,
+                "sub": sub,
+                "body": body_text,
+                "pricing": pricing
+            })
+
+    #
+    # for quot in quotes_to_run:
+    #     sqft, beds, baths = quot[0]
+    #
+    #     sub, body_text = autocalc(sqft, bed, bath, quot[1], quot[2], quot[3],
+    #                               quot[4], quot[5], quot[7], )
+
+
+        # sub, body_text = autocalc(sqft, bed, bath, stype_idx, first_name, last_name,
+        #                           "Joel", city, "DFW", factor_dfw, dfw_pricing)
+
+    # draft_list.append((sub, body_text, email))
+    # count += 1
 
     # Send drafts
     total = len(draft_list)
@@ -263,8 +362,6 @@ def convert_text_to_html(message_text):
 
 def create_draft(service, sender_name, sender, subject, message_text, receiver, area, label_name='Leads In Process'):
     try:
-        print(area, "sjhdf this one")
-
         message = MIMEMultipart('alternative')
         formatted_sender = formataddr((sender_name, sender))
 
@@ -356,7 +453,6 @@ def authenticate_gmail():
 
 
 def create_draft_route(subject, message_text, gmail, market):
-    print("this is the mark in creat draft route", market)
     creds = authenticate_gmail()
     if not creds:
         return "Failed to authenticate with Gmail."
@@ -369,7 +465,7 @@ def create_draft_route(subject, message_text, gmail, market):
     draft = create_draft(service, "Clean Affinity", sender_email, subject, message_text, gmail, market)
 
 
-def add_to_spreadsheet(raw_data, mrkt, tx_factors, dfw_amount, pdx_prices, dfw_prices):
+def add_to_spreadsheet(raw_data, mrkt, dfw_amount, pdx_prices, dfw_prices):
     # Path to your credentials.json file
     creds_file = r'vibrant-arcanum-432521-q2-e55244124dd0 (1).json'
 
@@ -381,10 +477,7 @@ def add_to_spreadsheet(raw_data, mrkt, tx_factors, dfw_amount, pdx_prices, dfw_p
     spreadsheet_id = '1mZ0TseN9pucJEDvQXAzCtKUUgSWT8802SMEo-BfL3KU'  # Replace with your actual spreadsheet ID
     sheet_name = 'Sheet1'  # Replace with your actual sheet name
 
-    # print("eawe", raw_data)
-    print(raw_data, "THSI WE RAWWW")
-    data = revise_list(raw_data, mrkt, tx_factors, dfw_amount, pdx_prices, dfw_prices)
-    # print("rege", data)
+    data = revise_list(raw_data, mrkt, dfw_amount, pdx_prices, dfw_prices)
 
     try:
         sheet = client.open_by_key(spreadsheet_id).worksheet(sheet_name)
@@ -418,133 +511,39 @@ months_list = ("January", "February", "March", "April", "May", "June", "July", "
 month = months_list[today.month-1]
 
 
-def update_prices(mark, ot, initial, move, monthly, biweekly, weekly):
-    factors, texas_factors = update_servers(mark)
-    set_ot, set_initial, set_move, set_monthly, set_biweekly, set_weekly = map(float, factors)
-    # print(texas_factors)
-    if (ot, initial, move, monthly, biweekly, weekly) == (set_ot, set_initial, set_move, set_monthly, set_biweekly,
-                                                          set_weekly):
-        print("No change needed")
-    else:
-        ot, initial, move, monthly, biweekly, weekly = set_ot, set_initial, set_move, set_monthly, set_biweekly, set_weekly
-        print("Prices successfully updated!")
-    return texas_factors, ot, initial, move, monthly, biweekly, weekly
+# def update_prices(mark, ot, initial, move, monthly, biweekly, weekly):
+#     factors, texas_factors = update_servers(mark)
+#     set_ot, set_initial, set_move, set_monthly, set_biweekly, set_weekly = map(float, factors)
+#     # print(texas_factors)
+#     if (ot, initial, move, monthly, biweekly, weekly) == (set_ot, set_initial, set_move, set_monthly, set_biweekly,
+#                                                           set_weekly):
+#         print("No change needed")
+#     else:
+#         ot, initial, move, monthly, biweekly, weekly = set_ot, set_initial, set_move, set_monthly, set_biweekly, set_weekly
+#         print("Prices successfully updated!")
+#     return texas_factors, ot, initial, move, monthly, biweekly, weekly
 
 
-def calc_sqft_price(sqft):
-    sqft_price = 70
-    try:
-        if sqft < 1000.01:
-            sqft_price = 70
-        elif sqft < 2000.01:
-            sqft_price = 90
-        elif sqft < 2701:
-            sqft_price = 120
-        elif sqft < 3500.01:
-            sqft_price = 140
-        elif sqft < 4200:
-            sqft_price = 160
-        elif sqft < 10500:
-            sqft_price = sqft * 0.05
-    except ValueError and UnboundLocalError and IndexError and UnboundLocalError:
-        print("Error Loading Quote")
-    return sqft_price
-
-
-def autocalc(sqft, beds, baths, type_clean, name_first, name_last, username, city, market, texas_factors, pricing):
-    print(market)
-    print(sqft, beds, baths, type_clean, name_first, name_last, username, city)
-    ot = pricing['ot']
-    move = pricing['move']
+def autocalc(sqft, beds, baths, type_clean_numerical, name_first, name_last, username, city, market, pricing):
+    # For some reason the type clean is off by +1 on each quote so biweekly = weekly pricing etc.
+    type_converter = ['', 'initial', 'ot', 'move', 'weekly', 'biweekly', 'monthly']
+    type_clean = type_converter[type_clean_numerical+1]
+    type_clean_price = type_converter[type_clean_numerical + 2]
     initial = pricing['initial']
-    weekly = pricing['weekly']
-    biweekly = pricing['biweekly']
-    monthly = pricing['monthly']
+    ongoing = pricing[type_clean_price]
 
-    elite = 250
-    ongoing = 140
-    try:
-        # These are the base prices that are the minimum cost of cleans
-        try:
-            price_sqft = calc_sqft_price(int(sqft))
-            before_price = float(baths) * 30 + float(beds) * 5 + price_sqft
-        except ValueError:
-            print("Error Loading Quote")
+    if type_clean not in ("ot", "move"):
+        elite = initial
+    else:
+        elite = pricing[type_clean_price]
 
-        # ["ONETIME", "MOVE", "WEEKLY", "BIWEEKLY", "MONTHLY"]
-        dfw_type_clean = type_clean
-        if type_clean == 0:
-            elite = before_price * ot
-        if type_clean == 1:
-            elite = before_price * move
-        if type_clean == 2:
-            ongoing = before_price * weekly
-        if type_clean == 3:
-            ongoing = before_price * biweekly
-        if type_clean == 4:
-            if market == "DFW" and before_price < 109:
-                ongoing = 109 * monthly
-            else:
-                ongoing = before_price * monthly
+    title = get_title(sqft, beds, baths, type_clean_numerical, name_last, name_first)
+    if market == "DFW":
+        main_info = get_quote_dfw(month, round(elite), round(ongoing), type_clean_numerical, name_first, username, city)
+    else:
+        main_info = get_quote(month, round(elite), round(ongoing), type_clean_numerical, name_first, username, city)
 
-        if dfw_type_clean >= 1:
-            dfw_type_clean += 1
-
-        # Order of cleanings is switched on the estimator to go OT initial move monthly biweekly week. So i swap the weekly and monthly numbers
-        if dfw_type_clean == 3:
-            dfw_type_clean = 5
-        elif dfw_type_clean == 5:
-            dfw_type_clean = 3
-
-        if type_clean == 2 or type_clean == 3 or type_clean == 4:
-            elite = before_price * initial
-            if ongoing < 140:
-                if dfw_type_clean == 3 and market == "DFW":
-                    if ongoing < 109:
-                        ongoing = 109
-                else:
-                    ongoing = 140
-
-        # DFW type is 6 when you select far
-        if market == "DFW" and dfw_type_clean != 6:
-            ongoing = ongoing * texas_factors[dfw_type_clean]
-
-        if market != "DFW":
-            if type_clean != 1 and type_clean != 0:
-                if elite < 200:
-                    elite = 200
-            else:
-                if elite < 250:
-                    elite = 250
-        else:
-            if type_clean != 1:
-                if type_clean != 0:
-                    if elite < 150:
-                        elite = 150
-                else:
-                    if elite > 273:
-                        elite += 100
-                    elif elite < 150:
-                        elite = 150
-            else:
-                if type_clean != 0:
-                    if elite > 300:
-                        elite += 100
-                if elite < 250:
-                    elite = 250
-
-        print(before_price, elite, "moving factor", move, texas_factors[dfw_type_clean], texas_factors)
-
-        title = get_title(sqft, beds, baths, type_clean, name_last, name_first)
-        if market == "DFW":
-            main_info = get_quote_dfw(month, round(elite), round(ongoing), type_clean, name_first, username, city)
-        else:
-            main_info = get_quote(month, round(elite), round(ongoing), type_clean, name_first, username, city)
-
-        return title, main_info
-
-    except TypeError:
-        return "nothing", "nothing"
+    return title, main_info
 
 
 # This is all the different scripts
@@ -552,10 +551,9 @@ def get_title(sqft, beds, baths, part_list, last, first):
     sqft = int(sqft)
     sqft = round(sqft/10)*10
     beds = int(beds)
-    try:
+
+    if baths == int(baths):
         baths = int(baths)
-    except ValueError:
-        baths = float(baths)
 
     if beds <= 1 >= baths:
         scripts = [f"{last}, {first} - One Time Clean {sqft} sqft, {beds} Bed, {baths} Bath",

@@ -1,4 +1,4 @@
-from add_to_spreadsheet import update_prices
+# from add_to_spreadsheet import update_prices
 from flask import Flask, render_template_string, request, redirect, url_for
 from google.auth.transport.requests import Request
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -11,6 +11,7 @@ from email.mime.text import MIMEText
 import re
 from mapcodes import get_zone
 from add_to_spreadsheet import add_to_spreadsheet
+from quoting import download_all_sheets
 
 app = Flask(__name__)
 
@@ -29,6 +30,10 @@ if os.path.exists("token.pickle"):
     print("token.pickle has been deleted")
 else:
     print("token.pickle does not exist")
+
+quotes_to_run = []
+
+# download_all_sheets()
 
 def authenticate_gmail():
     # update_prices(market)
@@ -169,8 +174,7 @@ def index():
     chart_of_profitable = ['weekly', 'biweekly', 'monthly', 'move', 'onetime']
     ot = initial = move = monthly = biweekly = weekly = 0
     market = "PDX"
-    texas_factors, ot, initial, move, monthly, biweekly, weekly = update_prices(market, ot, initial, move, monthly,
-                                                                                biweekly, weekly)
+
     pricing_pdx = {
         'ot': ot,
         'initial': initial,
@@ -180,6 +184,7 @@ def index():
         'weekly': weekly
     }
     # --- Process PDX emails first ---
+    emails_markets = []
     for i in emails:
         if 'body' not in i:
             continue
@@ -203,17 +208,17 @@ def index():
                     else:
                         print("Did not add because of better duplicate.")
                 else:
-                    print("added", last_lead[0:2])
                     all_leads.append(check_first)
                     lead_emails_for_doubles.append(last_lead[2])
                     lead_type_for_doubles.append(last_lead[1])
+                    # print("doubles", lead_emails_for_doubles) 1/22/2026
+                    # print("types", lead_type_for_doubles)
         except (TypeError, ValueError):
             print("Skipped due to invalid zone or lead info.")
 
     # --- Now process DFW emails separately ---
     market = "DFW"
-    texas_factors, ot, initial, move, monthly, biweekly, weekly = update_prices(market, ot, initial, move, monthly,
-                                                                                biweekly, weekly)
+
     pricing_dfw = {
         'ot': ot,
         'initial': initial,
@@ -247,7 +252,6 @@ def index():
                     else:
                         print("Did not add (DFW) due to better duplicate.")
                 else:
-                    print("added (DFW)", last_lead[0:2])
                     all_leads.append(check_first)
                     lead_emails_for_doubles.append(last_lead[2])
                     lead_type_for_doubles.append(last_lead[1])
@@ -255,10 +259,9 @@ def index():
             print("Skipped (DFW) due to invalid zone or lead info.")
 
     # Final push to spreadsheet
-    print("before add spreadsheet", market)
     after_dfw_len = len(all_leads)
     total_dfw_leads = after_dfw_len - before_dfw_len
-    add_to_spreadsheet(all_leads, market, texas_factors, total_dfw_leads, pricing_pdx, pricing_dfw)
+    add_to_spreadsheet(all_leads, market, total_dfw_leads, pricing_pdx, pricing_dfw)
 
     html_template = """
         <h1>Latest Emails from {{ label_id }}</h1>
@@ -315,6 +318,7 @@ def parse_email_details(text, mark):
         address = None
 
     print(name, email, bed, bath, sqft, phone)
+    quotes_to_run.append({"sqft": sqft, "beds": bed, "baths": bath})
 
     # UTM parameters in the specified order
     utm_order = [
@@ -333,7 +337,6 @@ def parse_email_details(text, mark):
         if match:
             # Check if the captured value contains a <br> and strip it off if present
             utm_value = match.group(1).split('<br>')[0].strip()
-            # print("got one", utm_value)
             if utm_value != "":
                 break
 
