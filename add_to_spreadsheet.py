@@ -233,6 +233,7 @@ def revise_list(data, mark, dfw_count, pdx_pricing, dfw_pricing):
 
     final_outputs = []
 
+    count = 0
     for market_index, market_batch in enumerate(quotes_to_run):
 
         market_results = all_results_quotes[market_index]
@@ -256,6 +257,10 @@ def revise_list(data, mark, dfw_count, pdx_pricing, dfw_pricing):
             username = quote[4]
             city = quote[5]
             market = quote[6]  # keep original casing if you want
+
+            email = revised_data[count]
+            email = email[13]
+            count += 1
 
             # Pricing output for this quote
             pricing = result["output"]  # list of Decimals
@@ -300,6 +305,7 @@ def revise_list(data, mark, dfw_count, pdx_pricing, dfw_pricing):
 
     # Send drafts
     total = len(draft_list)
+    print(draft_list)
     for i, (sub, body_text, email) in enumerate(draft_list):
         label_market = "DFW" if i >= total - dfw_count else "PDX"
         create_draft_route(sub, body_text, email, label_market)
