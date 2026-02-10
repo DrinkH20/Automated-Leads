@@ -33,7 +33,7 @@ else:
 
 quotes_to_run = []
 
-# download_all_sheets()
+download_all_sheets()
 
 def authenticate_gmail():
     # update_prices(market)
