@@ -311,7 +311,6 @@ def revise_list(data, mark, dfw_count, pdx_pricing, dfw_pricing):
 
     # Send drafts
     total = len(draft_list)
-    print(draft_list)
     for i, (sub, body_text, email) in enumerate(draft_list):
         label_market = "DFW" if i >= total - dfw_count else "PDX"
         create_draft_route(sub, body_text, email, label_market)
@@ -547,11 +546,9 @@ def autocalc(sqft, beds, baths, type_clean_numerical, name_first, name_last, use
 
     if type_clean not in ("ot", "move"):
         elite = initial
-        print("not ot", type_clean, type_clean_numerical, elite)
 
     else:
         elite = pricing[type_clean_price]
-        print("ot", type_clean, type_clean_numerical, elite)
 
     title = get_title(sqft, beds, baths, type_clean_numerical, name_last, name_first)
     if market == "DFW":
