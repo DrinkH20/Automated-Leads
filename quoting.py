@@ -4,6 +4,10 @@ import xlwings as xw
 import shutil
 import os
 from win32com.client import gencache
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
+import time
+from decimal import Decimal
 
 
 # def download_specific_sheet(market, download_dir="sheets"):
@@ -60,6 +64,33 @@ shutil.rmtree(genpy_dir, ignore_errors=True)
 gencache.is_readonly = False
 gencache.Rebuild()
 
+MARKET_OUTPUT_CELLS = {
+    "pdx": {
+        "initial": "I22",
+        "ot": "I20",
+        "move": "I24",
+        "weekly": "D30",
+        "biweekly": "D28",
+        "monthly": "D26",
+    },
+    "dfw": {
+        "initial": "I22",
+        "ot": "I20",
+        "move": "I24",
+        "weekly": "D30",
+        "biweekly": "D28",
+        "monthly": "D26",
+    },
+    "phx": {
+        "initial": "I22",
+        "ot": "I20",
+        "move": "I24",
+        "weekly": "I30",
+        "biweekly": "I28",
+        "monthly": "I26",
+    },
+}
+
 
 def download_specific_sheet(market, download_dir="sheets"):
     import requests
@@ -112,87 +143,121 @@ def download_all_sheets(download_dir="sheets"):
 
 from decimal import Decimal
 
+from decimal import Decimal, InvalidOperation
+
+def safe_decimal(val):
+    if val is None:
+        return Decimal("0")
+
+    if isinstance(val, (int, float, Decimal)):
+        return Decimal(str(val))
+
+    val = str(val).strip()
+
+    if val == "":
+        return Decimal("0")
+
+    # Remove currency symbols and commas
+    val = val.replace("$", "").replace(",", "")
+
+    try:
+        return Decimal(val)
+    except InvalidOperation:
+        print("BAD DECIMAL VALUE:", val)
+        return Decimal("0")
+
+
 def make_quote(initial, ot, move, weekly, biweekly, monthly):
     return {
-        "initial": Decimal(str(initial)),
-        "ot": Decimal(str(ot)),
-        "move": Decimal(str(move)),
-        "weekly": Decimal(str(weekly)),
-        "biweekly": Decimal(str(biweekly)),
-        "monthly": Decimal(str(monthly)),
+        "initial": safe_decimal(initial),
+        "ot": safe_decimal(ot),
+        "move": safe_decimal(move),
+        "weekly": safe_decimal(weekly),
+        "biweekly": safe_decimal(biweekly),
+        "monthly": safe_decimal(monthly),
     }
 
 
-def batch_get_quotes(market, quotes_list, download_dir="sheets"):
+def batch_get_quotes(market, quotes_list):
     """
-    Runs quotes in batch using the existing Excel estimator file.
-    quotes_list = list of dicts like [{'sqft': 1500, 'beds': 1, 'baths': 1}, ...]
-    Returns: List of quote results
+    Fast batch quote engine using Google Sheets calculation.
+
+    quotes_list = [
+        {'sqft': 1500, 'beds': 1, 'baths': 1},
+        ...
+    ]
     """
+    import time
+    import gspread
+    from oauth2client.service_account import ServiceAccountCredentials
+
     market = market.lower()
-    file_path = os.path.join(download_dir, f"{market}.xlsx")
 
-    app = xw.App(visible=False)
-    book = app.books.open(file_path)
-    sheet = book.sheets["Estimator"]
+    MARKET_SHEETS = {
+        "pdx": "1VHiCVG3sYEwoeBHVkWruhEC5n2q5AL3K4SJzpYbj5XA",
+        "dfw": "1mYiEYwutXg5R3NAD9ymzN8SwSVRmCKtnD4M_gUDzNlQ",
+        "phx": "1C0GogsJO1kiQkf3e4Nzr5nPsFECF4QeAl5w7nRQby6c"
+    }
+
+    if market not in MARKET_SHEETS:
+        raise ValueError("Invalid market")
+
+    scope = [
+        "https://spreadsheets.google.com/feeds",
+        "https://www.googleapis.com/auth/drive"
+    ]
+    creds = ServiceAccountCredentials.from_json_keyfile_name(
+        "google_secrets.json", scope
+    )
+    client = gspread.authorize(creds)
+
+    sheet = client.open_by_key(MARKET_SHEETS[market]).worksheet("Estimator")
+
+    # Prepare input
+    inputs = [[q["sqft"], q["beds"], q["baths"]] for q in quotes_list]
+    start_row = 2
+    end_row = start_row + len(inputs) - 1
+    sheet.update(f"A{start_row}:C{end_row}", inputs)
+
+    time.sleep(1.2)  # add a small buffer to allow calc
+
+    # Pull results
     results = []
+    cells = MARKET_OUTPUT_CELLS[market]
 
-    for i, q in enumerate(quotes_list):
-        # Set inputs
-        sheet.range("E3").value = q['sqft']
-        sheet.range("E4").value = q['beds']
-        sheet.range("E5").value = q['baths']
-        app.calculate()  # Excel recalculates
+    for q in quotes_list:
+        sheet.update("E3", [[int(q["sqft"])]])
+        sheet.update("E4", [[int(q["beds"])]])
+        sheet.update("E5", [[float(q["baths"])]])
 
-        # Pull values
-        # if market == "phx":
-        #     quote = [
-        #         sheet.range("I22").value,
-        #         sheet.range("I20").value,
-        #         sheet.range("I24").value,
-        #         sheet.range("I30").value,
-        #         sheet.range("I28").value,
-        #         sheet.range("I26").value
-        #     ]
-        # else:
-        #     quote = [
-        #         sheet.range("I22").value,
-        #         sheet.range("I20").value,
-        #         sheet.range("I24").value,
-        #         sheet.range("D30").value,
-        #         sheet.range("D28").value,
-        #         sheet.range("D26").value
-        #     ]
-        if market == "phx":
-            quote = make_quote(
-                sheet.range("I22").value,  # initial
-                sheet.range("I20").value,  # ot
-                sheet.range("I24").value,  # move
-                sheet.range("I30").value,  # weekly
-                sheet.range("I28").value,  # biweekly
-                sheet.range("I26").value  # monthly
-            )
-        else:
-            quote = make_quote(
-                sheet.range("I22").value,  # initial
-                sheet.range("I20").value,  # ot
-                sheet.range("I24").value,  # move
-                sheet.range("D30").value,  # weekly
-                sheet.range("D28").value,  # biweekly
-                sheet.range("D26").value  # monthly
-            )
+        time.sleep(0.15)  # small buffer for calc (tune down later)
 
-        # results.append({
-        #     "input": q,
-        #     "output": quote
-        # })
-        results.append({
-            "output": quote
-        })
+        quote = make_quote(
+            sheet.acell(cells["initial"]).value,
+            sheet.acell(cells["ot"]).value,
+            sheet.acell(cells["move"]).value,
+            sheet.acell(cells["weekly"]).value,
+            sheet.acell(cells["biweekly"]).value,
+            sheet.acell(cells["monthly"]).value,
+        )
+        results.append({"output": quote})
 
-    book.close()
-    app.quit()
     return results
+
+
+def pull_quote_from_sheet(sheet, market):
+    cells = MARKET_OUTPUT_CELLS[market]
+
+    return make_quote(
+        sheet.range(cells["initial"]).value,
+        sheet.range(cells["ot"]).value,
+        sheet.range(cells["move"]).value,
+        sheet.range(cells["weekly"]).value,
+        sheet.range(cells["biweekly"]).value,
+        sheet.range(cells["monthly"]).value,
+    )
+
+
 
 # market = "PDX"
 

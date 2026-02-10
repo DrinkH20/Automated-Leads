@@ -473,7 +473,7 @@ def create_draft_route(subject, message_text, gmail, market):
 
 def add_to_spreadsheet(raw_data, mrkt, dfw_amount, pdx_prices, dfw_prices):
     # Path to your credentials.json file
-    creds_file = r'vibrant-arcanum-432521-q2-e55244124dd0 (1).json'
+    creds_file = r'google_secrets.json'
 
     # Connect to the Google Sheets API
     creds = Credentials.from_service_account_file(creds_file, scopes=["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive", 'https://www.googleapis.com/auth/gmail.modify'])
@@ -483,6 +483,7 @@ def add_to_spreadsheet(raw_data, mrkt, dfw_amount, pdx_prices, dfw_prices):
     spreadsheet_id = '1mZ0TseN9pucJEDvQXAzCtKUUgSWT8802SMEo-BfL3KU'  # Replace with your actual spreadsheet ID
     sheet_name = 'Sheet1'  # Replace with your actual sheet name
 
+    print(raw_data, mrkt, dfw_amount, pdx_prices, dfw_prices)
     data = revise_list(raw_data, mrkt, dfw_amount, pdx_prices, dfw_prices)
 
     try:
@@ -533,15 +534,18 @@ month = months_list[today.month-1]
 def autocalc(sqft, beds, baths, type_clean_numerical, name_first, name_last, username, city, market, pricing):
     # For some reason the type clean is off by +1 on each quote so biweekly = weekly pricing etc.
     type_converter = ['', 'initial', 'ot', 'move', 'weekly', 'biweekly', 'monthly']
-    type_clean = type_converter[type_clean_numerical+1]
+    type_clean = type_converter[type_clean_numerical+2]
     type_clean_price = type_converter[type_clean_numerical + 2]
     initial = pricing['initial']
     ongoing = pricing[type_clean_price]
 
     if type_clean not in ("ot", "move"):
         elite = initial
+        print("not ot", type_clean, type_clean_numerical, elite)
+
     else:
         elite = pricing[type_clean_price]
+        print("ot", type_clean, type_clean_numerical, elite)
 
     title = get_title(sqft, beds, baths, type_clean_numerical, name_last, name_first)
     if market == "DFW":
