@@ -203,12 +203,18 @@ def revise_list(data, mark, dfw_count, pdx_pricing, dfw_pricing):
                                  "Joel", city, "DFW"))
             count += 1
 
-    quotes_to_run = (quotes_to_run_dfw, quotes_to_run_pdx)
+    quotes_to_run = [
+        batch
+        for batch in (quotes_to_run_dfw, quotes_to_run_pdx)
+        if batch and len(batch) > 0
+    ]
 
     all_results_quotes = []
+    print("quotes_to_run", quotes_to_run)
     for market_batch in quotes_to_run:
 
         # Market is consistent inside each sublist, so grab it from the first record
+        print("Market batch val", market_batch)
         market = market_batch[0][6].lower()
 
         formatted_quotes = []
