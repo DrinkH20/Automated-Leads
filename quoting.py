@@ -232,8 +232,10 @@ def batch_get_quotes(market, quotes_list):
         "https://www.googleapis.com/auth/drive"
     ]
 
+    BASE_DIR = os.getenv("APP_BASE_DIR", os.path.dirname(os.path.abspath(__file__)))
+    creds_file = os.path.join(BASE_DIR, "credentials", "google_secrets.json")
     creds = ServiceAccountCredentials.from_json_keyfile_name(
-        "google_secrets.json", scope
+        creds_file, scope
     )
 
     client = gspread.authorize(creds)

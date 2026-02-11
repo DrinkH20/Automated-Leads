@@ -24,7 +24,8 @@ from quoting import batch_get_quotes
 
 SCOPES = ['https://www.googleapis.com/auth/gmail.readonly', 'https://www.googleapis.com/auth/gmail.compose']
 
-CREDENTIALS_FILE = r'google_secrets.json'
+BASE_DIR = os.getenv("APP_BASE_DIR", os.path.dirname(os.path.abspath(__file__)))
+CREDENTIALS_FILE = os.path.join(BASE_DIR, "credentials", "google_secrets.json")
 TOKEN_FILE = 'token.pickle'
 
 
@@ -284,7 +285,8 @@ def revise_list(data, mark, dfw_count, pdx_pricing, dfw_pricing):
                 market,
                 pricing  # ← if your autocalc needs the pricing array
             )
-            draft_list.append((sub, body_text, email))
+            # draft_list.append((sub, body_text, email))
+            draft_list.append((sub, body_text, email, market))
 
             final_outputs.append({
                 "name": f"{first_name} {last_name}",
@@ -310,12 +312,15 @@ def revise_list(data, mark, dfw_count, pdx_pricing, dfw_pricing):
     # count += 1
 
     # Send drafts
-    total = len(draft_list)
-    for i, (sub, body_text, email) in enumerate(draft_list):
-        label_market = "DFW" if i >= total - dfw_count else "PDX"
-        create_draft_route(sub, body_text, email, label_market)
+    # total = len(draft_list)
+    # for i, (sub, body_text, email) in enumerate(draft_list):
+    #     label_market = "DFW" if i >= total - dfw_count else "PDX"
+    #     create_draft_route(sub, body_text, email, label_market)
+    #
+    # return revised_data
+    # Don't send drafts here. Just return them.
+    return revised_data, draft_list
 
-    return revised_data
 
 def create_label_if_not_exists(service, user_id, label_name, markt=None):
     """Creates a new label if it doesn't exist."""
@@ -483,7 +488,8 @@ def add_to_spreadsheet(raw_data, mrkt, dfw_amount, pdx_prices, dfw_prices):
     from datetime import date
 
     # Path to your credentials.json file
-    creds_file = r'google_secrets.json'
+    BASE_DIR = os.getenv("APP_BASE_DIR", os.path.dirname(os.path.abspath(__file__)))
+    creds_file = os.path.join(BASE_DIR, "credentials", "google_secrets.json")
 
     creds = Credentials.from_service_account_file(
         creds_file,
@@ -499,9 +505,8 @@ def add_to_spreadsheet(raw_data, mrkt, dfw_amount, pdx_prices, dfw_prices):
     spreadsheet_id = '1mZ0TseN9pucJEDvQXAzCtKUUgSWT8802SMEo-BfL3KU'
     sheet_name = 'Sheet1'
 
-    print(raw_data, mrkt, dfw_amount, pdx_prices, dfw_prices)
-
-    data = revise_list(raw_data, mrkt, dfw_amount, pdx_prices, dfw_prices)
+    # data = revise_list(raw_data, mrkt, dfw_amount, pdx_prices, dfw_prices)
+    data, draft_list = revise_list(raw_data, mrkt, dfw_amount, pdx_prices, dfw_prices)
 
     try:
         sheet = client.open_by_key(spreadsheet_id).worksheet(sheet_name)
@@ -533,6 +538,7 @@ def add_to_spreadsheet(raw_data, mrkt, dfw_amount, pdx_prices, dfw_prices):
         print(f"Spreadsheet with ID '{spreadsheet_id}' not found.")
     except Exception as e:
         print(f"An error occurred: {e}")
+    return draft_list
 
 
 

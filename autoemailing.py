@@ -1,5 +1,6 @@
 # from add_to_spreadsheet import update_prices
-from flask import Flask, render_template_string, request, redirect, url_for
+# from flask import Flask, render_template_string, request, redirect, url_for
+from jinja2 import Template
 from google.auth.transport.requests import Request
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
@@ -10,64 +11,58 @@ import base64
 from email.mime.text import MIMEText
 import re
 from mapcodes import get_zone
-from add_to_spreadsheet import add_to_spreadsheet
+from add_to_spreadsheet import add_to_spreadsheet, create_draft
 from quoting import download_all_sheets
 
-app = Flask(__name__)
+
+# app = Flask(__name__)
 
 
 # Enable logging to capture any issues
 logging.basicConfig(level=logging.DEBUG)
 
-# Path to your client_secrets.json file which is actually checkmail
-CREDENTIALS_FILE = r'client_secret.json'
-TOKEN_FILE = 'token.pickle'
+BASE_DIR = os.getenv("APP_BASE_DIR", os.path.dirname(os.path.abspath(__file__)))
+CREDENTIALS_FILE = os.path.join(BASE_DIR, "credentials", "client_secret.json")
+TOKEN_FILE = os.path.join(BASE_DIR, "credentials", "token.pickle")
+
 
 # Define the Gmail API scope
 SCOPES = ['https://www.googleapis.com/auth/gmail.readonly', 'https://www.googleapis.com/auth/gmail.compose', 'https://www.googleapis.com/auth/gmail.modify']
 
-if os.path.exists("token.pickle"):
-    os.remove("token.pickle")
-    print("token.pickle has been deleted")
-else:
-    print("token.pickle does not exist")
+# if os.path.exists("token.pickle"):
+#     os.remove("token.pickle")
+#     print("token.pickle has been deleted")
+# else:
+#     print("token.pickle does not exist")
 
 quotes_to_run = []
 
 # download_all_sheets()
 
 def authenticate_gmail():
-    # update_prices(market)
     try:
         creds = None
-        logging.debug("Starting authentication process.")
 
-        # Check if token.pickle exists
         if os.path.exists(TOKEN_FILE):
-            logging.debug("Found existing token file. Loading credentials.")
             with open(TOKEN_FILE, 'rb') as token:
                 creds = pickle.load(token)
 
-        # If no valid credentials, perform OAuth flow
         if not creds or not creds.valid:
-            logging.debug("No valid credentials found or credentials are invalid/expired.")
             if creds and creds.expired and creds.refresh_token:
-                logging.debug("Credentials are expired, attempting to refresh.")
                 creds.refresh(Request())
             else:
-                logging.debug("Running OAuth flow to obtain new credentials.")
-                flow = InstalledAppFlow.from_client_secrets_file(CREDENTIALS_FILE, SCOPES)
-                creds = flow.run_local_server(port=0)
+                flow = InstalledAppFlow.from_client_secrets_file(
+                    CREDENTIALS_FILE, SCOPES
+                )
+                creds = flow.run_local_server(port=8080)
 
-            # Save the credentials for future use
             with open(TOKEN_FILE, 'wb') as token:
-                logging.debug("Saving new credentials to token file.")
                 pickle.dump(creds, token)
 
-        logging.debug("Authentication process completed.")
         return creds
+
     except Exception as e:
-        logging.error(f"An error occurred during authentication: {e}")
+        logging.error(f"Authentication error: {e}")
         return None
 
 
@@ -154,8 +149,9 @@ def decode_base64(data):
     return decoded_bytes.decode('UTF-8')
 
 
-@app.route('/')
-def index():
+# @app.route('/')
+# def index():
+def run_automation():
     creds = authenticate_gmail()
     if not creds:
         return "Failed to authenticate with Gmail."
@@ -280,7 +276,25 @@ def index():
     # Final push to spreadsheet
     after_dfw_len = len(all_leads)
     total_dfw_leads = after_dfw_len - before_dfw_len
-    add_to_spreadsheet(all_leads, market, total_dfw_leads, pricing_pdx, pricing_dfw)
+    # add_to_spreadsheet(all_leads, market, total_dfw_leads, pricing_pdx, pricing_dfw)
+    draft_list = add_to_spreadsheet(all_leads, market, total_dfw_leads, pricing_pdx, pricing_dfw)
+
+    # Create Gmail drafts using the *same* authenticated service
+    user_info = service.users().getProfile(userId='me').execute()
+    sender_email = user_info['emailAddress']
+
+    for sub, body_text, receiver_email, lead_market in draft_list:
+        create_draft(
+            service=service,
+            sender_name="Clean Affinity",
+            sender=sender_email,
+            subject=sub,
+            message_text=body_text,
+            receiver=receiver_email,
+            area=lead_market,  # "PDX"/"DFW"/"PHX"
+            label_name="Leads In Process"
+        )
+
     # Remove LeadsNotYetContacted label after successful processing
     if processed_message_ids:
         label_id = get_label_id(service, "LeadsNotYetContacted")
@@ -309,7 +323,8 @@ def index():
         </ul>
         """
 
-    return render_template_string(html_template, emails=emails, label_id=label_id)
+    template = Template(html_template)
+    return template.render(emails=emails, label_id=label_id)
 
 
 def parse_email_details(text, mark):
@@ -351,7 +366,6 @@ def parse_email_details(text, mark):
     else:
         address = None
 
-    print(name, email, bed, bath, sqft, phone)
     quotes_to_run.append({"sqft": sqft, "beds": bed, "baths": bath})
 
     # UTM parameters in the specified order
@@ -410,5 +424,9 @@ def get_label_id(service, label_name):
         return None
 
 
-if __name__ == '__main__':
-    app.run(debug=True, port=5200)
+# if __name__ == '__main__':
+#     app.run(debug=True, port=5200)
+
+
+if __name__ == "__main__":
+    run_automation()
