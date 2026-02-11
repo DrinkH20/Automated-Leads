@@ -8,55 +8,8 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import time
 from decimal import Decimal
-
-
-# def download_specific_sheet(market, download_dir="sheets"):
-#     import requests
-#     import os
-#     market_sheets = {
-#         "pdx": "1VHiCVG3sYEwoeBHVkWruhEC5n2q5AL3K4SJzpYbj5XA",
-#         "dfw": "1mYiEYwutXg5R3NAD9ymzN8SwSVRmCKtnD4M_gUDzNlQ",
-#         "phx": "1C0GogsJO1kiQkf3e4Nzr5nPsFECF4QeAl5w7nRQby6c"
-#     }
-#
-#     sheet_id = market_sheets.get(market.lower())
-#     if not sheet_id:
-#         raise ValueError(f"Invalid market: {market}")
-#
-#     os.makedirs(download_dir, exist_ok=True)
-#     url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=xlsx"
-#     response = requests.get(url)
-#     if response.status_code != 200:
-#         raise RuntimeError(f"Failed to download sheet for {market}: {response.status_code}")
-#
-#     file_path = os.path.join(download_dir, f"{market}.xlsx")
-#     with open(file_path, "wb") as f:
-#         f.write(response.content)
-#
-#     print(f"Downloaded sheet for {market.upper()} → {file_path}")
-#     return file_path
-
-
-# def download_all_sheets(download_dir="sheets"):
-#     import requests
-#     import os
-#
-#     market_sheets = {
-#         "pdx": "1VHiCVG3sYEwoeBHVkWruhEC5n2q5AL3K4SJzpYbj5XA",
-#         "dfw": "1mYiEYwutXg5R3NAD9ymzN8SwSVRmCKtnD4M_gUDzNlQ",
-#         "phx": "1C0GogsJO1kiQkf3e4Nzr5nPsFECF4QeAl5w7nRQby6c"
-#     }
-#     os.makedirs(download_dir, exist_ok=True)
-#     for market, sheet_id in market_sheets.items():
-#         url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=xlsx"
-#         response = requests.get(url)
-#         if response.status_code == 200:
-#             file_path = os.path.join(download_dir, f"{market}.xlsx")
-#             with open(file_path, "wb") as f:
-#                 f.write(response.content)
-#             print(f"{market.upper()} sheet downloaded.")
-#         else:
-#             print(f"Failed to download {market} sheet: {response.status_code}")
+from gspread.exceptions import APIError
+import time
 
 
 genpy_dir = os.path.join(os.environ['LOCALAPPDATA'], 'Temp', 'gen_py')
@@ -178,16 +131,88 @@ def make_quote(initial, ot, move, weekly, biweekly, monthly):
     }
 
 
+# def batch_get_quotes(market, quotes_list):
+#     """
+#     Fast batch quote engine using Google Sheets calculation.
+#
+#     quotes_list = [
+#         {'sqft': 1500, 'beds': 1, 'baths': 1},
+#         ...
+#     ]
+#     """
+#     import time
+#     import gspread
+#     from oauth2client.service_account import ServiceAccountCredentials
+#
+#     market = market.lower()
+#
+#     MARKET_SHEETS = {
+#         "pdx": "1VHiCVG3sYEwoeBHVkWruhEC5n2q5AL3K4SJzpYbj5XA",
+#         "dfw": "1mYiEYwutXg5R3NAD9ymzN8SwSVRmCKtnD4M_gUDzNlQ",
+#         "phx": "1C0GogsJO1kiQkf3e4Nzr5nPsFECF4QeAl5w7nRQby6c"
+#     }
+#
+#     if market not in MARKET_SHEETS:
+#         raise ValueError("Invalid market")
+#
+#     scope = [
+#         "https://spreadsheets.google.com/feeds",
+#         "https://www.googleapis.com/auth/drive"
+#     ]
+#     creds = ServiceAccountCredentials.from_json_keyfile_name(
+#         "google_secrets.json", scope
+#     )
+#     client = gspread.authorize(creds)
+#
+#     sheet = client.open_by_key(MARKET_SHEETS[market]).worksheet("Estimator")
+#
+#     # Prepare input
+#     inputs = [[q["sqft"], q["beds"], q["baths"]] for q in quotes_list]
+#     start_row = 2
+#     end_row = start_row + len(inputs) - 1
+#     sheet.update(f"A{start_row}:C{end_row}", inputs)
+#
+#     time.sleep(1.2)  # add a small buffer to allow calc
+#
+#     # Pull results
+#     results = []
+#     cells = MARKET_OUTPUT_CELLS[market]
+#
+#     for q in quotes_list:
+#         sheet.update("E3", [[int(q["sqft"])]])
+#         sheet.update("E4", [[int(q["beds"])]])
+#         sheet.update("E5", [[float(q["baths"])]])
+#
+#         time.sleep(0.15)  # small buffer for calc (tune down later)
+#
+#         quote = make_quote(
+#             sheet.acell(cells["initial"]).value,
+#             sheet.acell(cells["ot"]).value,
+#             sheet.acell(cells["move"]).value,
+#             sheet.acell(cells["weekly"]).value,
+#             sheet.acell(cells["biweekly"]).value,
+#             sheet.acell(cells["monthly"]).value,
+#         )
+#         results.append({"output": quote})
+#
+#     return results
+
+def safe_update(sheet, range_name, values, retries=5):
+    for i in range(retries):
+        try:
+            sheet.update(range_name, values)
+            return
+        except APIError as e:
+            if "429" in str(e):
+                time.sleep(2 ** i)
+            else:
+                raise
+
 def batch_get_quotes(market, quotes_list):
     """
-    Fast batch quote engine using Google Sheets calculation.
-
-    quotes_list = [
-        {'sqft': 1500, 'beds': 1, 'baths': 1},
-        ...
-    ]
+    Quota-safe batch quote engine using Google Sheets calculation.
     """
-    import time
+
     import gspread
     from oauth2client.service_account import ServiceAccountCredentials
 
@@ -206,40 +231,48 @@ def batch_get_quotes(market, quotes_list):
         "https://spreadsheets.google.com/feeds",
         "https://www.googleapis.com/auth/drive"
     ]
+
     creds = ServiceAccountCredentials.from_json_keyfile_name(
         "google_secrets.json", scope
     )
-    client = gspread.authorize(creds)
 
+    client = gspread.authorize(creds)
     sheet = client.open_by_key(MARKET_SHEETS[market]).worksheet("Estimator")
 
-    # Prepare input
-    inputs = [[q["sqft"], q["beds"], q["baths"]] for q in quotes_list]
-    start_row = 2
-    end_row = start_row + len(inputs) - 1
-    sheet.update(f"A{start_row}:C{end_row}", inputs)
-
-    time.sleep(1.2)  # add a small buffer to allow calc
-
-    # Pull results
     results = []
     cells = MARKET_OUTPUT_CELLS[market]
 
-    for q in quotes_list:
-        sheet.update("E3", [[int(q["sqft"])]])
-        sheet.update("E4", [[int(q["beds"])]])
-        sheet.update("E5", [[float(q["baths"])]])
+    # Prepare the output ranges for batch read
+    output_ranges = [
+        cells["initial"],
+        cells["ot"],
+        cells["move"],
+        cells["weekly"],
+        cells["biweekly"],
+        cells["monthly"],
+    ]
 
-        time.sleep(0.15)  # small buffer for calc (tune down later)
+    for q in quotes_list:
+
+        # 🔥 1 API CALL INSTEAD OF 3
+        safe_update(sheet, "E3:E5", [
+            [int(q["sqft"])],
+            [int(q["beds"])],
+            [float(q["baths"])]
+        ])
+
+        # 🔥 1 API CALL INSTEAD OF 6
+        values = sheet.batch_get(output_ranges)
 
         quote = make_quote(
-            sheet.acell(cells["initial"]).value,
-            sheet.acell(cells["ot"]).value,
-            sheet.acell(cells["move"]).value,
-            sheet.acell(cells["weekly"]).value,
-            sheet.acell(cells["biweekly"]).value,
-            sheet.acell(cells["monthly"]).value,
+            values[0][0][0] if values[0] else 0,
+            values[1][0][0] if values[1] else 0,
+            values[2][0][0] if values[2] else 0,
+            values[3][0][0] if values[3] else 0,
+            values[4][0][0] if values[4] else 0,
+            values[5][0][0] if values[5] else 0,
         )
+
         results.append({"output": quote})
 
     return results

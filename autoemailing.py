@@ -33,7 +33,7 @@ else:
 
 quotes_to_run = []
 
-download_all_sheets()
+# download_all_sheets()
 
 def authenticate_gmail():
     # update_prices(market)
@@ -109,13 +109,22 @@ def fetch_emails(service, label_id='INBOX', dfw_label_id=None):
                     headers = msg['payload'].get('headers', [])
                     subject = next((h['value'] for h in headers if h['name'] == 'Subject'), "(No Subject)")
                     body = get_email_body(msg['payload'])
-                    dfw_emails.append({'subject': subject, 'body': body})
+                    dfw_emails.append({
+                        'subject': subject,
+                        'body': body,
+                        'id': message['id']
+                    })
+
                     continue
 
                 headers = msg['payload']['headers']
                 subject = next(header['value'] for header in headers if header['name'] == 'Subject')
                 body = get_email_body(msg['payload'])
-                emails.append({'subject': subject, 'body': body})
+                emails.append({
+                    'subject': subject,
+                    'body': body,
+                    'id': message['id']
+                })
 
             if not page_token:
                 break
@@ -165,6 +174,7 @@ def index():
         return f"Label '{label_name}' not found."
 
     all_leads = []
+    processed_message_ids = []
     lead_emails_for_doubles = []
     lead_type_for_doubles = []
 
@@ -202,6 +212,8 @@ def index():
                         lead_type_for_doubles.pop(idx)
 
                         all_leads.append(check_first)
+                        processed_message_ids.append(i['id'])
+
                         lead_emails_for_doubles.append(last_lead[2])
                         lead_type_for_doubles.append(last_lead[1])
                         print("Removed duplicate lead and replaced with better one.")
@@ -209,6 +221,8 @@ def index():
                         print("Did not add because of better duplicate.")
                 else:
                     all_leads.append(check_first)
+                    processed_message_ids.append(i['id'])
+
                     lead_emails_for_doubles.append(last_lead[2])
                     lead_type_for_doubles.append(last_lead[1])
                     # print("doubles", lead_emails_for_doubles) 1/22/2026
@@ -246,6 +260,8 @@ def index():
                         lead_type_for_doubles.pop(idx)
 
                         all_leads.append(check_first)
+                        processed_message_ids.append(i['id'])
+
                         lead_emails_for_doubles.append(last_lead[2])
                         lead_type_for_doubles.append(last_lead[1])
                         print("Removed duplicate lead and replaced with better one (DFW).")
@@ -253,6 +269,8 @@ def index():
                         print("Did not add (DFW) due to better duplicate.")
                 else:
                     all_leads.append(check_first)
+                    processed_message_ids.append(i['id'])
+
                     lead_emails_for_doubles.append(last_lead[2])
                     lead_type_for_doubles.append(last_lead[1])
         except (TypeError, ValueError):
@@ -262,6 +280,21 @@ def index():
     after_dfw_len = len(all_leads)
     total_dfw_leads = after_dfw_len - before_dfw_len
     add_to_spreadsheet(all_leads, market, total_dfw_leads, pricing_pdx, pricing_dfw)
+    # Remove LeadsNotYetContacted label after successful processing
+    if processed_message_ids:
+        label_id = get_label_id(service, "LeadsNotYetContacted")
+
+        if label_id:
+            for msg_id in processed_message_ids:
+                try:
+                    service.users().messages().modify(
+                        userId='me',
+                        id=msg_id,
+                        body={"removeLabelIds": [label_id]}
+                    ).execute()
+                    logging.debug(f"Removed label from message {msg_id}")
+                except Exception as e:
+                    logging.error(f"Failed to remove label from {msg_id}: {e}")
 
     html_template = """
         <h1>Latest Emails from {{ label_id }}</h1>

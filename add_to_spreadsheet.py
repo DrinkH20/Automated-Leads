@@ -210,11 +210,11 @@ def revise_list(data, mark, dfw_count, pdx_pricing, dfw_pricing):
     ]
 
     all_results_quotes = []
-    print("quotes_to_run", quotes_to_run)
+    # print("quotes_to_run", quotes_to_run)
     for market_batch in quotes_to_run:
 
         # Market is consistent inside each sublist, so grab it from the first record
-        print("Market batch val", market_batch)
+        # print("Market batch val", market_batch)
         market = market_batch[0][6].lower()
 
         formatted_quotes = []
@@ -393,9 +393,10 @@ def create_draft(service, sender_name, sender, subject, message_text, receiver, 
 
         message['to'] = receiver
         if area.upper() == "PDX":
-            message['from'] = "hello@cleanaffinity.com"
+            message['from'] = formataddr(("Clean Affinity", "hello@cleanaffinity.com"))
         else:
-            message['from'] = "hellodfw@cleanaffinity.com"
+            message['from'] = formataddr(("Clean Affinity", "hellodfw@cleanaffinity.com"))
+
         message['subject'] = subject
 
         raw = base64.urlsafe_b64encode(message.as_bytes()).decode()
@@ -477,38 +478,54 @@ def create_draft_route(subject, message_text, gmail, market):
 
 
 def add_to_spreadsheet(raw_data, mrkt, dfw_amount, pdx_prices, dfw_prices):
+    from google.oauth2.service_account import Credentials
+    import gspread
+    from datetime import date
+
     # Path to your credentials.json file
     creds_file = r'google_secrets.json'
 
-    # Connect to the Google Sheets API
-    creds = Credentials.from_service_account_file(creds_file, scopes=["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive", 'https://www.googleapis.com/auth/gmail.modify'])
+    creds = Credentials.from_service_account_file(
+        creds_file,
+        scopes=[
+            "https://www.googleapis.com/auth/spreadsheets",
+            "https://www.googleapis.com/auth/drive",
+            "https://www.googleapis.com/auth/gmail.modify"
+        ]
+    )
+
     client = gspread.authorize(creds)
 
-    # Open the spreadsheet by its ID
-    spreadsheet_id = '1mZ0TseN9pucJEDvQXAzCtKUUgSWT8802SMEo-BfL3KU'  # Replace with your actual spreadsheet ID
-    sheet_name = 'Sheet1'  # Replace with your actual sheet name
+    spreadsheet_id = '1mZ0TseN9pucJEDvQXAzCtKUUgSWT8802SMEo-BfL3KU'
+    sheet_name = 'Sheet1'
 
     print(raw_data, mrkt, dfw_amount, pdx_prices, dfw_prices)
+
     data = revise_list(raw_data, mrkt, dfw_amount, pdx_prices, dfw_prices)
 
     try:
         sheet = client.open_by_key(spreadsheet_id).worksheet(sheet_name)
         print(f"Successfully accessed the spreadsheet '{sheet_name}'.")
 
-        for item in data:
-            # Ensure each item has exactly 18 columns
-            if len(item) != 18:
-                print(f"Skipping item with incorrect number of columns: {item}")
-                continue
+        # 🔥 Filter valid rows first
+        rows_to_insert = [item for item in data if len(item) == 18]
 
-            # Find the next available row (starting from the first column)
-            row_number = len(sheet.col_values(1)) + 1
+        if not rows_to_insert:
+            print("No valid rows to insert.")
+            return
 
-            # Debugging: Print the item and its length to ensure correct insertion
-            print(f"Inserting row {row_number}: {item} (Length: {len(item)})")
+        # 🔥 Find next available row ONCE (1 read call)
+        existing_rows = sheet.col_values(1)
+        start_row = len(existing_rows) + 1
+        end_row = start_row + len(rows_to_insert) - 1
 
-            # Append the revised data to the next available columns
-            sheet.insert_row(item, index=row_number, value_input_option='RAW')
+        update_range = f"A{start_row}:R{end_row}"
+
+        print(f"Inserting {len(rows_to_insert)} rows at once "
+              f"(Rows {start_row}–{end_row})")
+
+        # 🔥 ONE WRITE CALL
+        sheet.update(update_range, rows_to_insert, value_input_option="RAW")
 
         print("Data appended successfully.")
 
@@ -516,6 +533,7 @@ def add_to_spreadsheet(raw_data, mrkt, dfw_amount, pdx_prices, dfw_prices):
         print(f"Spreadsheet with ID '{spreadsheet_id}' not found.")
     except Exception as e:
         print(f"An error occurred: {e}")
+
 
 
 today = date.today()
