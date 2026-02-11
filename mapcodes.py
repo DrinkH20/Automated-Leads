@@ -44,8 +44,10 @@ def geocode_address_google(address):
     geolocator = GoogleV3(api_key=api_key)
 
     # Append "USA" to give geocoder proper context
-    if not address or "undefined" in address.lower():
-        raise ValueError(f"Invalid address passed to geocoder: {address}")
+    address = address.replace("<br>", " ").strip()
+
+    if "undefined" in address.lower():
+        address = None
 
     location = geolocator.geocode(f"{address}, USA")
 
