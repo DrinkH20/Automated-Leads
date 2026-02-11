@@ -1,0 +1,16 @@
+# Google Secrets
+google_secrets.json
+client_secret.json
+token.json
+token.pickle
+
+# Credentials folders
+credentials/
+
+# Python
+__pycache__/
+*.pyc
+
+# IDE
+.idea/
+.vscode/
