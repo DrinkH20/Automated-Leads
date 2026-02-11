@@ -8,11 +8,11 @@ from geopy.geocoders import GoogleV3
 import re
 # latitude, longitude = 0, 0
 import os
-api_key = os.getenv("API_KEY")
+api_key = os.getenv("GOOGLE_MAPS_API_KEY")
 
 def get_city_from_coordinates_google(latitude, longitude):
     # Replace with your Google Maps API key
-    geolocator = GoogleV3(api_key)
+    geolocator = GoogleV3(api_key=api_key)
 
     # Perform reverse geocoding
     location = geolocator.reverse((latitude, longitude), exactly_one=True)
