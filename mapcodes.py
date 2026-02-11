@@ -7,11 +7,12 @@ from opencage.geocoder import OpenCageGeocode
 from geopy.geocoders import GoogleV3
 import re
 # latitude, longitude = 0, 0
-
+import os
+api_key = os.getenv("API_KEY")
 
 def get_city_from_coordinates_google(latitude, longitude):
     # Replace with your Google Maps API key
-    geolocator = GoogleV3(api_key="")
+    geolocator = GoogleV3(api_key)
 
     # Perform reverse geocoding
     location = geolocator.reverse((latitude, longitude), exactly_one=True)
@@ -39,7 +40,7 @@ def get_city_from_coordinates_google(latitude, longitude):
 #         return location.latitude, location.longitude, city
 #     else:
 #         return None
-def geocode_address_google(address, api_key):
+def geocode_address_google(address):
     geolocator = GoogleV3(api_key=api_key)
 
     # Append "USA" to give geocoder proper context
@@ -95,19 +96,20 @@ def is_point_in_zone(zones, lat, lon):
             return zone['name']
     return None
 
-def get_zone(address, mrkt, api_key=""):
+
+def get_zone(address, mrkt):
     city = "city"
     if address:
         if mrkt == "PDX":
             with open('zones_output.json', 'r') as f:
                 zones = json.load(f)
         else:
-            with open('dfw_zones_output1.json', 'r') as f:
+            with open('dfw_zones_output.json', 'r') as f:
                 zones = json.load(f)
 
         latitude, longitude = 0, 0
 
-        location = geocode_address_google(address, api_key)
+        location = geocode_address_google(address)
 
         if location:
             latitude, longitude, city = location

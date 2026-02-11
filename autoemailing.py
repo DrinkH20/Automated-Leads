@@ -15,11 +15,12 @@ from quoting import download_all_sheets
 
 app = Flask(__name__)
 
+
 # Enable logging to capture any issues
 logging.basicConfig(level=logging.DEBUG)
 
 # Path to your client_secrets.json file which is actually checkmail
-CREDENTIALS_FILE = r'client_secret_1_833814108979-7l6vv2lc6kjit5c1toqpb0sbdq6mtuca.apps.googleusercontent.com (1).json'
+CREDENTIALS_FILE = r'client_secret.json'
 TOKEN_FILE = 'token.pickle'
 
 # Define the Gmail API scope

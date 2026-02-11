@@ -24,7 +24,7 @@ from quoting import batch_get_quotes
 
 SCOPES = ['https://www.googleapis.com/auth/gmail.readonly', 'https://www.googleapis.com/auth/gmail.compose']
 
-CREDENTIALS_FILE = r'checkmail.json'
+CREDENTIALS_FILE = r'google_secrets.json'
 TOKEN_FILE = 'token.pickle'
 
 
