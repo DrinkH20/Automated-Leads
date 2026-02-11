@@ -388,6 +388,10 @@ def parse_email_details(text, mark):
             if utm_value != "":
                 break
 
+    print("DEBUG NAME:", name)
+    print("DEBUG ADDRESS RAW:", address)
+    print("DEBUG ZIP:", mark)
+
     return name, service_type, email, sqft, bed, bath, get_zone(address, mark), phone, utm_value
     # return name, service_type, email, sqft, bed, bath, get_zone(address), utm_value
 
