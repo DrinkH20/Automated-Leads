@@ -12,7 +12,8 @@ from gspread.exceptions import APIError
 import time
 
 
-genpy_dir = os.path.join(os.environ['LOCALAPPDATA'], 'Temp', 'gen_py')
+import tempfile
+genpy_dir = os.path.join(tempfile.gettempdir(), 'gen_py')
 shutil.rmtree(genpy_dir, ignore_errors=True)
 # gencache.is_readonly = False
 # gencache.Rebuild()
