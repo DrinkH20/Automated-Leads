@@ -79,7 +79,13 @@ def get_label_ids_by_name(service, label_names):
             label_map[label['name']] = label['id']
     return label_map
 
-def fetch_emails(service, label_id='INBOX', dfw_label_id=None):
+# def fetch_emails(service, label_id='INBOX', dfw_label_id=None):
+def fetch_emails(service, label_id, dfw_label_id=None, phx_label_id=None):
+
+    pdx_emails = []
+    dfw_emails = []
+    phx_emails = []
+
     try:
         emails = []
         dfw_emails = []
@@ -100,6 +106,19 @@ def fetch_emails(service, label_id='INBOX', dfw_label_id=None):
                 label_ids = msg.get('labelIds', [])
 
                 # Match using label ID, not name
+                if phx_label_id and phx_label_id in label_ids:
+                    logging.debug(f"Skipping DFW-labeled email: {message['id']}")
+                    headers = msg['payload'].get('headers', [])
+                    subject = next((h['value'] for h in headers if h['name'] == 'Subject'), "(No Subject)")
+                    body = get_email_body(msg['payload'])
+                    phx_emails.append({
+                        'subject': subject,
+                        'body': body,
+                        'id': message['id']
+                    })
+
+                    continue
+
                 if dfw_label_id and dfw_label_id in label_ids:
                     logging.debug(f"Skipping DFW-labeled email: {message['id']}")
                     headers = msg['payload'].get('headers', [])
@@ -116,7 +135,7 @@ def fetch_emails(service, label_id='INBOX', dfw_label_id=None):
                 headers = msg['payload']['headers']
                 subject = next(header['value'] for header in headers if header['name'] == 'Subject')
                 body = get_email_body(msg['payload'])
-                emails.append({
+                pdx_emails.append({
                     'subject': subject,
                     'body': body,
                     'id': message['id']
@@ -125,7 +144,8 @@ def fetch_emails(service, label_id='INBOX', dfw_label_id=None):
             if not page_token:
                 break
 
-        return emails, dfw_emails
+        # return emails, dfw_emails
+        return pdx_emails, dfw_emails, phx_emails
 
     except Exception as e:
         logging.error(f"An error occurred: {e}")
@@ -336,19 +356,29 @@ def run_automation():
     logging.debug("Gmail service created successfully.")
 
     # ---- Get Label IDs ----
-    label_ids = get_label_ids_by_name(service, ['LeadsNotYetContacted', 'DFW'])
+    # label_ids = get_label_ids_by_name(service, ['LeadsNotYetContacted', 'DFW'])
+    # lead_label_id = label_ids.get('LeadsNotYetContacted')
+    # dfw_label_id = label_ids.get('DFW')
+    label_ids = get_label_ids_by_name(service, ['LeadsNotYetContacted', 'DFW', 'PHX'])
     lead_label_id = label_ids.get('LeadsNotYetContacted')
     dfw_label_id = label_ids.get('DFW')
+    phx_label_id = label_ids.get('PHX')
 
     if not lead_label_id:
         logging.error("LeadsNotYetContacted label not found.")
         return
 
     # ---- Fetch Emails ----
-    emails, dfw_emails = fetch_emails(
+    # emails, dfw_emails = fetch_emails(
+    #     service,
+    #     label_id=lead_label_id,
+    #     dfw_label_id=dfw_label_id
+    # )
+    pdx_emails, dfw_emails, phx_emails = fetch_emails(
         service,
         label_id=lead_label_id,
-        dfw_label_id=dfw_label_id
+        dfw_label_id=dfw_label_id,
+        phx_label_id=phx_label_id
     )
 
     all_leads = []
@@ -373,20 +403,25 @@ def run_automation():
                 if not lead:
                     continue
 
+
                 name, service_type, email, sqft, bed, bath, zone, phone, utm = lead
+                lead = (name, service_type, email, sqft, bed, bath, zone, phone, utm, market)
 
                 # ---- Validation ----
-                if not zone:
-                    continue
+                # if not zone:
+                #     continue
+                #
+                # try:
+                #     in_zone = int(zone[0])
+                #     beds = int(bed)
+                # except (ValueError, TypeError):
+                #     continue
+                if market != "PHX":
+                    if not zone or not isinstance(zone, (list, tuple)) or not zone[0]:
+                        continue
 
-                try:
-                    in_zone = int(zone[0])
-                    beds = int(bed)
-                except (ValueError, TypeError):
-                    continue
-
-                if in_zone <= 0 or beds <= 0:
-                    continue
+                # if in_zone <= 0 or beds <= 0:
+                #     continue
 
                 # ---- Duplicate Handling ----
                 if email in seen_leads:
@@ -406,15 +441,19 @@ def run_automation():
                 logging.error(f"Error processing lead: {e}")
 
     # ---- Process PDX then DFW ----
-    process_email_list(emails, "PDX")
-    before_dfw_len = len(all_leads)
-
+    process_email_list(pdx_emails, "PDX")
     process_email_list(dfw_emails, "DFW")
-    after_dfw_len = len(all_leads)
+    process_email_list(phx_emails, "PHX")
 
-    total_dfw_leads = after_dfw_len - before_dfw_len
-    if total_dfw_leads is None:
-        total_dfw_leads = 0
+    # process_email_list(emails, "PDX")
+    # before_dfw_len = len(all_leads)
+    #
+    # process_email_list(dfw_emails, "DFW")
+    # after_dfw_len = len(all_leads)
+
+    # total_dfw_leads = after_dfw_len - before_dfw_len
+    # if total_dfw_leads is None:
+    #     total_dfw_leads = 0
 
     # ---- Pricing Structures ----
     pricing_template = {
@@ -430,10 +469,17 @@ def run_automation():
     pricing_dfw = pricing_template.copy()
 
     # ---- Push to Spreadsheet ----
+    # draft_list = add_to_spreadsheet(
+    #     all_leads,
+    #     "DFW",  # preserve your original function signature
+    #     total_dfw_leads,
+    #     pricing_pdx,
+    #     pricing_dfw
+    # )
     draft_list = add_to_spreadsheet(
         all_leads,
-        "DFW",  # preserve your original function signature
-        total_dfw_leads,
+        "DFW",
+        0,  # placeholder — no longer used
         pricing_pdx,
         pricing_dfw
     )
@@ -472,8 +518,6 @@ def run_automation():
                 logging.error(f"Failed removing label from {msg_id}: {e}")
 
     logging.info("Automation run complete.")
-
-
 
 
 # def parse_email_details(text, mark):

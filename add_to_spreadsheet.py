@@ -141,6 +141,7 @@ def revise_list(data, mark, dfw_count, pdx_pricing, dfw_pricing):
     quotes_to_run_phx = []
     for item in data:
         # Unpack what you *know*; guard lengths
+        market = item[9] if len(item) > 9 else "PDX"
         name         = item[0] if len(item) > 0 else None
         service_type = item[1] if len(item) > 1 else None
         email        = item[2] if len(item) > 2 else None
@@ -193,20 +194,37 @@ def revise_list(data, mark, dfw_count, pdx_pricing, dfw_pricing):
         ))
 
         # Compose draft using market split
-        if (len(data) - count) > dfw_count:
-            quotes_to_run_dfw.append(((sqft, bed, bath), stype_idx, first_name, last_name,
-                                      "Joel", city, "PDX"))
-            count += 1
-            # sub, body_text = autocalc(sqft, bed, bath, stype_idx, first_name, last_name,
-            #                           "Joel", city, "PDX", factor_dfw, pdx_pricing)
-        else:
-            quotes_to_run_pdx.append(((sqft, bed, bath), stype_idx, first_name, last_name,
-                                 "Joel", city, "DFW"))
+        # if (len(data) - count) > dfw_count:
+        #     quotes_to_run_dfw.append(((sqft, bed, bath), stype_idx, first_name, last_name,
+        #                               "Joel", city, "PDX"))
+        #     count += 1
+        #     # sub, body_text = autocalc(sqft, bed, bath, stype_idx, first_name, last_name,
+        #     #                           "Joel", city, "PDX", factor_dfw, pdx_pricing)
+        # else:
+        #     quotes_to_run_pdx.append(((sqft, bed, bath), stype_idx, first_name, last_name,
+        #                          "Joel", city, "DFW"))
+        quote_tuple = (
+            (sqft, bed, bath),
+            stype_idx,
+            first_name,
+            last_name,
+            "Joel",
+            city,
+            market
+        )
+
+        if market == "PDX":
+            quotes_to_run_pdx.append(quote_tuple)
+        elif market == "DFW":
+            quotes_to_run_dfw.append(quote_tuple)
+        elif market == "PHX":
+            quotes_to_run_phx.append(quote_tuple)
+
             count += 1
 
     quotes_to_run = [
         batch
-        for batch in (quotes_to_run_dfw, quotes_to_run_pdx)
+        for batch in (quotes_to_run_dfw, quotes_to_run_pdx, quotes_to_run_phx)
         if batch and len(batch) > 0
     ]
 
@@ -381,13 +399,17 @@ def create_draft(service, sender_name, sender, subject, message_text, receiver, 
         message = MIMEMultipart('alternative')
         formatted_sender = formataddr((sender_name, sender))
 
-        if area.upper() != "DFW":
+        if area.upper() == "PDX":
             footer_html = """
             <table width="206" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;border-spacing:0px;color:rgb(20,49,65);font-family:proxima-nova,sans-serif;font-size:16px"><tbody><tr><td style="margin:auto;padding:0px 0px 1px"><a href="https://cleanaffinity.com/" style="background-color:transparent;color:rgb(35,82,124);outline:0px;display:inline-block" target="_blank" data-saferedirecturl="https://www.google.com/url?q=https://cleanaffinity.com/&amp;source=gmail&amp;ust=1753387360204000&amp;usg=AOvVaw1_qGxFX9vNvZj88nCJmRhf"><img width="200" src="https://ci3.googleusercontent.com/meips/ADKq_NaHCjqRyVIbvhTlEb3vGPvT6jjSyDbNyBJE7ZhgTdaYGWQ2Ux1vTrGvxNSFWCoI_7YLbi2lyvNToByk2wku5X4Ty3j2kGBnqDThP-lz5meLf3ComXVwEg=s0-d-e1-ft#https://s1g.s3.amazonaws.com/325e6b8720f2f9a00d074326edf01a9f.png" style="border:none;vertical-align:baseline" class="CToWUd" data-bit="iit"></a></td></tr><tr><td height="4" style="padding:0px;border-top:3px solid rgb(0,0,0)"></td></tr><tr><td style="padding:0px;vertical-align:middle;color:rgb(0,0,0);font-size:12px;font-family:helvetica,arial"><span style="font-weight:700"><span style="font-size:15px">Office Team</span></span><br><br><table cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;border-spacing:0px;background-color:transparent;margin:0px 1px 1px 0px"><tbody><tr><td style="padding:0px 1px 0px 0px"><img width="33" height="33" src="https://ci3.googleusercontent.com/meips/ADKq_Nbu8BcqvPO0NsMt0thKm1fy5BM-bke3tekFIPLPj8-lOIllqWmOXD_sNYvqyTuFPb8NZLkVMMT1KtHKvYpfxBq-1Rs_P3kVVbF3j3_umEaigthjxIeBBg=s0-d-e1-ft#https://s1g.s3.amazonaws.com/3e17acc3e1f17ca0eb066f92112030d4.png" alt="email" style="border:none;vertical-align:baseline" class="CToWUd" data-bit="iit"></td><td style="padding:0px"><span style="font-size-adjust:none;font-stretch:normal;line-height:normal"><a href="mailto:hello@cleanaffinity.com" style="background-color:transparent;color:rgb(0,0,0)" target="_blank">hello@cleanaffinity.com</a></span></td></tr></tbody></table><table cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;border-spacing:0px;background-color:transparent;margin:0px 1px 1px 0px"><tbody><tr><td style="padding:0px 1px 0px 0px"><img width="33" height="33" src="https://ci3.googleusercontent.com/meips/ADKq_NbOvxEt5lgrvY7In4555tR498ZHVnamfeiNDuz0ihljVAOsV1JEkU7A8huN48KtfFD-RaiqMdvdbpefi2ElxhXdGOXBcb5OIoj2c5IudggNYU8JcBIWxA=s0-d-e1-ft#https://s1g.s3.amazonaws.com/6d17a9904ea926bfe5700c3e877f70c0.png" alt="mobile" style="border:none;vertical-align:baseline" class="CToWUd" data-bit="iit"></td><td style="padding:0px"><span style="font-size-adjust:none;font-stretch:normal;line-height:normal"><a href="tel:503-933-1917" target="_blank">503-933-1917</a></span></td></tr></tbody></table><table cellpadding="0" border="0" style="border-collapse:collapse;border-spacing:0px;background-color:transparent"><tbody><tr><td style="padding:0px 5px 0px 0px"><a href="https://facebook.com/cleanaffinity/" style="background-color:transparent;color:rgb(51,122,183);display:inline-block" target="_blank" data-saferedirecturl="https://www.google.com/url?q=https://facebook.com/cleanaffinity/&amp;source=gmail&amp;ust=1753387360204000&amp;usg=AOvVaw1PokiaSIca2gSp9_r74Pu2"><img width="33" height="33" src="https://ci3.googleusercontent.com/meips/ADKq_NarBJHUDBNpZSF5x9fwZRDVzxrCJQ0OjwhhH5kt5Prfkk-Ae1pCwBmyRD2fyPtAklyAZDBnTH8kUNq8b1zU9cy_YXAjjV7JVzc_0XoliAgiyxNqz8x5gw=s0-d-e1-ft#https://s1g.s3.amazonaws.com/2c5fe92c2cad30bc7beafa503141662b.png" alt="Facebook" style="border:none;vertical-align:baseline" class="CToWUd" data-bit="iit"></a></td><td style="padding:0px 5px 0px 0px"><a href="https://instagram.com/cleanaffinity/" style="background-color:transparent;color:rgb(51,122,183);display:inline-block" target="_blank" data-saferedirecturl="https://www.google.com/url?q=https://instagram.com/cleanaffinity/&amp;source=gmail&amp;ust=1753387360204000&amp;usg=AOvVaw16I4Z5Yx74Y6W15ySxm9yJ"><img width="33" height="33" src="https://ci3.googleusercontent.com/meips/ADKq_NZxAdIU3eRhJqF8PfQpL0gZAj4ovvZCNNIY4aDVSWm4yfk_nW9A5s6Dt3oi9y4mthvIgZViU5HaXEcUUK6Vx8sClYSC_nYEEwuRmnXan-ZJzjuWbkKNkw=s0-d-e1-ft#https://s1g.s3.amazonaws.com/85231364dae3871f3e2465f0e3e47239.png" alt="Instagram" style="border:none;vertical-align:baseline" class="CToWUd" data-bit="iit"></a></td></tr></tbody></table><a href="https://cleanaffinity.com/" style="background-color:transparent;color:rgb(0,0,0)" target="_blank" data-saferedirecturl="https://www.google.com/url?q=https://cleanaffinity.com/&amp;source=gmail&amp;ust=1753387360204000&amp;usg=AOvVaw1_qGxFX9vNvZj88nCJmRhf">cleanaffinity.com/</a><br></td></tr></tbody></table>
             """
-        else:
+        elif area.upper() == "DFW":
             footer_html = """
             <table width="206" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;border-spacing:0px;color:rgb(20,49,65);font-family:proxima-nova,sans-serif;font-size:16px"><tbody><tr><td style="margin:auto;padding:0px 0px 1px"><a href="https://cleanaffinity.com/" style="background-color:transparent;color:rgb(35,82,124);outline:0px;display:inline-block" target="_blank" data-saferedirecturl="https://www.google.com/url?q=https://cleanaffinity.com/&amp;source=gmail&amp;ust=1753390838452000&amp;usg=AOvVaw1Jdh4ThRFl97qfd7jNlOSq"><img width="200" src="https://ci3.googleusercontent.com/meips/ADKq_NaHCjqRyVIbvhTlEb3vGPvT6jjSyDbNyBJE7ZhgTdaYGWQ2Ux1vTrGvxNSFWCoI_7YLbi2lyvNToByk2wku5X4Ty3j2kGBnqDThP-lz5meLf3ComXVwEg=s0-d-e1-ft#https://s1g.s3.amazonaws.com/325e6b8720f2f9a00d074326edf01a9f.png" style="border:none;vertical-align:baseline" class="CToWUd" data-bit="iit"></a></td></tr><tr><td height="4" style="padding:0px;border-top:3px solid rgb(0,0,0)"></td></tr><tr><td style="padding:0px;vertical-align:middle;color:rgb(0,0,0);font-size:12px;font-family:helvetica,arial"><span style="font-weight:700"><span style="font-size:15px">Office Team</span></span><br><br><table cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;border-spacing:0px;background-color:transparent;margin:0px 1px 1px 0px"><tbody><tr><td style="padding:0px 1px 0px 0px"><img width="33" height="33" src="https://ci3.googleusercontent.com/meips/ADKq_Nbu8BcqvPO0NsMt0thKm1fy5BM-bke3tekFIPLPj8-lOIllqWmOXD_sNYvqyTuFPb8NZLkVMMT1KtHKvYpfxBq-1Rs_P3kVVbF3j3_umEaigthjxIeBBg=s0-d-e1-ft#https://s1g.s3.amazonaws.com/3e17acc3e1f17ca0eb066f92112030d4.png" alt="email" style="border:none;vertical-align:baseline" class="CToWUd" data-bit="iit"></td><td style="padding:0px"><span style="font-size-adjust:none;font-stretch:normal;line-height:normal"><a href="mailto:hellodfw@cleanaffinity.com" style="background-color:transparent;color:rgb(0,0,0)" target="_blank">hellodfw@cleanaffinity.com</a></span></td></tr></tbody></table><table cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;border-spacing:0px;background-color:transparent;margin:0px 1px 1px 0px"><tbody><tr><td style="padding:0px 1px 0px 0px"><img width="33" height="33" src="https://ci3.googleusercontent.com/meips/ADKq_NbOvxEt5lgrvY7In4555tR498ZHVnamfeiNDuz0ihljVAOsV1JEkU7A8huN48KtfFD-RaiqMdvdbpefi2ElxhXdGOXBcb5OIoj2c5IudggNYU8JcBIWxA=s0-d-e1-ft#https://s1g.s3.amazonaws.com/6d17a9904ea926bfe5700c3e877f70c0.png" alt="mobile" style="border:none;vertical-align:baseline" class="CToWUd" data-bit="iit"></td><td style="padding:0px"><span style="font-size-adjust:none;font-stretch:normal;line-height:normal"><a href="tel:972-318-4678" target="_blank">972-318-4678</a></span></td></tr></tbody></table><table cellpadding="0" border="0" style="border-collapse:collapse;border-spacing:0px;background-color:transparent"><tbody><tr><td style="padding:0px 5px 0px 0px"><a href="https://facebook.com/cleanaffinity/" style="background-color:transparent;color:rgb(51,122,183);display:inline-block" target="_blank" data-saferedirecturl="https://www.google.com/url?q=https://facebook.com/cleanaffinity/&amp;source=gmail&amp;ust=1753390838453000&amp;usg=AOvVaw3nrk9R9LBXsHPIEY36yHhu"><img width="33" height="33" src="https://ci3.googleusercontent.com/meips/ADKq_NarBJHUDBNpZSF5x9fwZRDVzxrCJQ0OjwhhH5kt5Prfkk-Ae1pCwBmyRD2fyPtAklyAZDBnTH8kUNq8b1zU9cy_YXAjjV7JVzc_0XoliAgiyxNqz8x5gw=s0-d-e1-ft#https://s1g.s3.amazonaws.com/2c5fe92c2cad30bc7beafa503141662b.png" alt="Facebook" style="border:none;vertical-align:baseline" class="CToWUd" data-bit="iit"></a></td><td style="padding:0px 5px 0px 0px"><a href="https://instagram.com/cleanaffinity/" style="background-color:transparent;color:rgb(51,122,183);display:inline-block" target="_blank" data-saferedirecturl="https://www.google.com/url?q=https://instagram.com/cleanaffinity/&amp;source=gmail&amp;ust=1753390838453000&amp;usg=AOvVaw0S9ak4Y_nKy5X1r4alhRtS"><img width="33" height="33" src="https://ci3.googleusercontent.com/meips/ADKq_NZxAdIU3eRhJqF8PfQpL0gZAj4ovvZCNNIY4aDVSWm4yfk_nW9A5s6Dt3oi9y4mthvIgZViU5HaXEcUUK6Vx8sClYSC_nYEEwuRmnXan-ZJzjuWbkKNkw=s0-d-e1-ft#https://s1g.s3.amazonaws.com/85231364dae3871f3e2465f0e3e47239.png" alt="Instagram" style="border:none;vertical-align:baseline" class="CToWUd" data-bit="iit"></a></td></tr></tbody></table><a href="https://cleanaffinity.com/home-cleaning-services-dallas/" style="background-color:transparent;color:rgb(0,0,0)" target="_blank" data-saferedirecturl="https://www.google.com/url?q=https://cleanaffinity.com/home-cleaning-services-dallas/&amp;source=gmail&amp;ust=1753390838453000&amp;usg=AOvVaw2n1bKaSwZdhhL_nJ_5XRq2">cleanaffinity.com/</a><br></td></tr></tbody></table>
+            """
+        elif area.upper() == "PHX":
+            footer_html = """
+            <table width="206" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;border-spacing:0px;color:rgb(20,49,65);font-family:proxima-nova,sans-serif;font-size:16px"><tbody><tr><td style="margin:auto;padding:0px 0px 1px"><a href="https://cleanaffinity.com/" style="background-color:transparent;color:rgb(35,82,124);outline:0px;display:inline-block" target="_blank"><img width="200" src="https://s1g.s3.amazonaws.com/325e6b8720f2f9a00d074326edf01a9f.png" style="border:none;vertical-align:baseline"></a></td></tr><tr><td height="4" style="padding:0px;border-top:3px solid rgb(0,0,0)"></td></tr><tr><td style="padding:0px;vertical-align:middle;color:rgb(0,0,0);font-size:12px;font-family:helvetica,arial"><span style="font-weight:700"><span style="font-size:15px">Office Team</span></span><br><br><table cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;border-spacing:0px;background-color:transparent;margin:0px 1px 1px 0px"><tbody><tr><td style="padding:0px 1px 0px 0px"><img width="33" height="33" src="https://s1g.s3.amazonaws.com/3e17acc3e1f17ca0eb066f92112030d4.png" alt="email" style="border:none;vertical-align:baseline"></td><td style="padding:0px"><span style="font-size-adjust:none;font-stretch:normal;line-height:normal"><a href="mailto:hellophx@cleanaffinity.com" style="background-color:transparent;color:rgb(0,0,0)" target="_blank">hellophx@cleanaffinity.com</a></span></td></tr></tbody></table><table cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;border-spacing:0px;background-color:transparent;margin:0px 1px 1px 0px"><tbody><tr><td style="padding:0px 1px 0px 0px"><img width="33" height="33" src="https://s1g.s3.amazonaws.com/6d17a9904ea926bfe5700c3e877f70c0.png" alt="mobile" style="border:none;vertical-align:baseline"></td><td style="padding:0px"><span style="font-size-adjust:none;font-stretch:normal;line-height:normal"><a href="tel:480-428-8450" target="_blank">480-428-8450</a></span></td></tr></tbody></table><table cellpadding="0" border="0" style="border-collapse:collapse;border-spacing:0px;background-color:transparent"><tbody><tr><td style="padding:0px 5px 0px 0px"><a href="https://facebook.com/cleanaffinity/" style="background-color:transparent;color:rgb(51,122,183);display:inline-block" target="_blank"><img width="33" height="33" src="https://s1g.s3.amazonaws.com/2c5fe92c2cad30bc7beafa503141662b.png" alt="Facebook" style="border:none;vertical-align:baseline"></a></td><td style="padding:0px 5px 0px 0px"><a href="https://instagram.com/cleanaffinity/" style="background-color:transparent;color:rgb(51,122,183);display:inline-block" target="_blank"><img width="33" height="33" src="https://s1g.s3.amazonaws.com/85231364dae3871f3e2465f0e3e47239.png" alt="Instagram" style="border:none;vertical-align:baseline"></a></td></tr></tbody></table><a href="https://cleanaffinity.com/home-cleaning-services-dallas/" style="background-color:transparent;color:rgb(0,0,0)" target="_blank">cleanaffinity.com/</a><br></td></tr></tbody></table>
             """
 
         html_message = convert_text_to_html(message_text) + footer_html
@@ -397,10 +419,20 @@ def create_draft(service, sender_name, sender, subject, message_text, receiver, 
         message.attach(MIMEText(html_message, 'html'))
 
         message['to'] = receiver
+        # if area.upper() == "PDX":
+        #     message['from'] = formataddr(("Clean Affinity", "hello@cleanaffinity.com"))
+        # else:
+        #     message['from'] = formataddr(("Clean Affinity", "hellodfw@cleanaffinity.com"))
+        message['subject'] = subject
+
         if area.upper() == "PDX":
-            message['from'] = formataddr(("Clean Affinity", "hello@cleanaffinity.com"))
-        else:
-            message['from'] = formataddr(("Clean Affinity", "hellodfw@cleanaffinity.com"))
+            sender_email = formataddr(("Clean Affinity", "hello@cleanaffinity.com"))
+        elif area.upper() == "DFW":
+            sender_email = formataddr(("Clean Affinity", "hellodfw@cleanaffinity.com"))
+        elif area.upper() == "PHX":
+            sender_email = formataddr(("Clean Affinity", "hellophx@cleanaffinity.com"))
+
+        message['from'] = sender_email
 
         message['subject'] = subject
 
@@ -421,6 +453,11 @@ def create_draft(service, sender_name, sender, subject, message_text, receiver, 
             dfw_id = create_label_if_not_exists(service, 'me', "DFW", area)
             if dfw_id:
                 label_ids.append(dfw_id)
+
+        if area.upper() == "PHX":
+            phx_id = create_label_if_not_exists(service, 'me', "PHX", area)
+            if phx_id:
+                label_ids.append(phx_id)
 
         # Apply labels
         if label_ids:
@@ -577,6 +614,8 @@ def autocalc(sqft, beds, baths, type_clean_numerical, name_first, name_last, use
     title = get_title(sqft, beds, baths, type_clean_numerical, name_last, name_first)
     if market == "DFW":
         main_info = get_quote_dfw(month, round(elite), round(ongoing), type_clean_numerical, name_first, username, city)
+    elif market == "PHX":
+        main_info = get_quote_phx(month, round(elite), round(ongoing), type_clean_numerical, name_first, username, city)
     else:
         main_info = get_quote(month, round(elite), round(ongoing), type_clean_numerical, name_first, username, city)
 
@@ -764,6 +803,84 @@ Best,
     return scripts[part_list]
 
 
+def get_quote_phx(date_month, initial, recuring, part_list, name="there", username="", city=""):
+    scripts = [f"""Hi {name},
+
+We’re excited to help make your home feel fresh and spotless!
+
+Based on the info you provided and our {date_month} special, your one-time clean will be ${initial} (Includes washing all interior window panes within arms reach!)
+
+•         Would you like any extras like fridge, oven, window blind or track cleaning?
+
+•         Are there any other cleaning needs/notes you would like for me to add to our list?
+
+Every technician on our team is background-checked, highly trained, and IICRC-certified, with great communication skills — so you can count on professionalism and care with every visit.
+
+Let me know if you would like to get on the schedule and if you have any preferred days/times. Our schedule fills up quickly (especially for the longer initial clean!), but we still have a few spots in {date_month}! What works best?
+
+We look forward to cleaning for you!
+{username}""", f"""Hi {name},
+
+We’re excited to help make your home feel fresh and spotless!
+Based on the info you provided and our {date_month} special, your moving clean will be ${initial} (Includes washing all interior window panes within arms reach!)
+
+•         Would you like any extras like fridge, oven, window blind or track cleaning?
+
+•         Are there any other cleaning needs/notes you would like for me to add to our list?
+
+Every technician on our team is background-checked, highly trained, and IICRC-certified, with great communication skills — so you can count on professionalism and care with every visit.
+
+Let me know if you would like to get on the schedule and if you have any preferred days/times. Our schedule fills up quickly (especially for the longer initial clean!), but we still have a few spots in {date_month}! What works best?
+
+We look forward to cleaning for you!
+{username}""", f"""Hi {name},
+
+We’d love to help get your home fresh and spotless!
+
+With the special we are running for {date_month}, your first clean is ${recuring} — the same rate as your weekly visits moving forward, with baseboards and interior windows included!
+
+All of our technicians are background-checked, highly trained, and IICRC-certified.
+
+{date_month} availability is limited — would you like me to hold an opening for you?
+
+Best,
+{username} 
+""", f"""Hi {name},
+
+We’d love to help get your home fresh and spotless!
+
+With the special we are running for {date_month}, your first clean is ${recuring} — the same rate as your biweekly visits moving forward, with baseboards and interior windows included!
+
+All of our technicians are background-checked, highly trained, and IICRC-certified.
+
+{date_month} availability is limited — would you like me to hold an opening for you?
+
+Best,
+{username} 
+""", f"""Hi {name},
+
+We’d love to help get your home fresh and spotless!
+
+With the special we are running for {date_month}, your first clean is ${recuring} — the same rate as your monthly visits moving forward, with baseboards and interior windows included!
+
+All of our technicians are background-checked, highly trained, and IICRC-certified.
+
+{date_month} availability is limited — would you like me to hold an opening for you?
+
+Best,
+{username} 
+""", f"""Hi {name},
+
+Thank you for reaching out about cleans! We'd love to help!
+
+It looks like the address you provided is in Salem which is outside of our service area. Do you have an address that is closer to the Phoenix area? Let me know and we'd love to help you with your cleaning needs!
+
+Best,
+
+{username}"""]
+    return scripts[part_list]
+
+
 def get_title_manual(sqft, beds, baths, part_list):
     sqft = int(sqft)
     sqft = round(sqft / 10) * 10
@@ -833,6 +950,114 @@ Based on your address it looks like {sqft} sqft, with {beds} beds and {baths} ba
 
 Is this something I can get on the schedule for you?
 """]
+    return scripts[part_list]
+
+
+def get_quote_text_dfw(date_month, initial, recuring, part_list, name="there", username="", sqft=0, beds=0, baths=0):
+    scripts = [f"""Hi {name}! {username} with Clean Affinity here
+
+Thanks for reaching out! For your {sqft} sqft home ({beds} beds, {baths} baths), your Elite one-time clean is ${initial} before sales tax with our {date_month} special — a full reset with interior windows and baseboards included so it feels fresh again.
+
+Most clients book this when they want things spotless without giving up their weekend.
+
+We also offer extras like fridge, oven, blinds, or track cleaning — would a morning or afternoon spot work better for you?
+""", f"""Hi {name}! {username} with Clean Affinity here
+
+Thanks for reaching out! For your {sqft} sqft home ({beds} beds, {baths} baths), your moving clean is ${initial} before sales tax with our {date_month} special — a full reset that includes interior windows and all reachable cabinet interiors so it feels brand new again.
+
+Most clients book this when they want things spotless without giving up their weekend.
+
+We also offer extras like fridge, oven, blinds, or track cleaning — would a morning or afternoon spot work better for you?
+""", f"""Hi {name}, this is {username} with Clean Affinity!
+
+For your {sqft} sq ft, {beds} bed / {baths} bath home:
+
+Your first clean is ${recuring} before sales tax with our {date_month} special — the same rate as your weekly cleans moving forward. (Baseboards and interior windows are included)
+
+All our technicians are background-checked, highly trained, and IICRC-certified.
+
+We only have a few {date_month} openings left — would you like me to hold one for you?
+""", f"""Hi {name}, this is {username} with Clean Affinity!
+
+For your {sqft} sq ft, {beds} bed / {baths} bath home:
+
+Your first clean is ${recuring} before sales tax with our {date_month} special — the same rate as your biweekly cleans moving forward. (Baseboards and interior windows are included)
+
+All our technicians are background-checked, highly trained, and IICRC-certified.
+
+We only have a few {date_month} openings left — would you like me to hold one for you?
+""", f"""Hi {name}, this is {username} with Clean Affinity!
+
+For your {sqft} sq ft, {beds} bed / {baths} bath home:
+
+Your first clean is ${recuring} before sales tax with our {date_month} special — the same rate as your monthly cleans moving forward. (Baseboards and interior windows are included)
+
+All our technicians are background-checked, highly trained, and IICRC-certified.
+
+We only have a few {date_month} openings left — would you like me to hold one for you? 
+""", f"""# Hi {name},
+
+Thank you for reaching out about cleans! We'd love to help!
+
+It looks like the address you provided is in Salem which is outside of our service area. Do you have an address that is closer to the Portland Metro area? Let me know and we'd love to help you with your cleaning needs!
+
+Best,
+
+{username}"""]
+    return scripts[part_list]
+
+
+def get_quote_text_phx(date_month, initial, recuring, part_list, name="there", username="", sqft=0, beds=0, baths=0):
+    scripts = [f"""Hi {name}! {username} with Clean Affinity here
+
+Thanks for reaching out! For your {sqft} sqft home ({beds} beds, {baths} baths), your Elite one-time clean is ${initial} with our {date_month} special — a full reset with interior windows and baseboards included so it feels fresh again.
+
+Most clients book this when they want things spotless without giving up their weekend.
+
+We also offer extras like fridge, oven, blinds, or track cleaning — would a morning or afternoon spot work better for you?
+""", f"""Hi {name}! {username} with Clean Affinity here
+
+Thanks for reaching out! For your {sqft} sqft home ({beds} beds, {baths} baths), your moving clean is ${initial} with our {date_month} special — a full reset that includes interior windows and all reachable cabinet interiors so it feels brand new again.
+
+Most clients book this when they want things spotless without giving up their weekend.
+
+We also offer extras like fridge, oven, blinds, or track cleaning — would a morning or afternoon spot work better for you?
+""", f"""Hi {name}, this is {username} with Clean Affinity!
+
+For your {sqft} sq ft, {beds} bed / {baths} bath home:
+
+Your first clean is ${recuring} with our {date_month} special — the same rate as your weekly cleans moving forward. (Baseboards and interior windows are included)
+
+All our technicians are background-checked, highly trained, and IICRC-certified.
+
+We only have a few {date_month} openings left — would you like me to hold one for you?
+""", f"""Hi {name}, this is {username} with Clean Affinity!
+
+For your {sqft} sq ft, {beds} bed / {baths} bath home:
+
+Your first clean is ${recuring} with our {date_month} special — the same rate as your biweekly cleans moving forward. (Baseboards and interior windows are included)
+
+All our technicians are background-checked, highly trained, and IICRC-certified.
+
+We only have a few {date_month} openings left — would you like me to hold one for you?
+""", f"""Hi {name}, this is {username} with Clean Affinity!
+
+For your {sqft} sq ft, {beds} bed / {baths} bath home:
+
+Your first clean is ${recuring} with our {date_month} special — the same rate as your monthly cleans moving forward. (Baseboards and interior windows are included)
+
+All our technicians are background-checked, highly trained, and IICRC-certified.
+
+We only have a few {date_month} openings left — would you like me to hold one for you?
+""", f"""# Hi {name},
+
+Thank you for reaching out about cleans! We'd love to help!
+
+It looks like the address you provided is in Salem which is outside of our service area. Do you have an address that is closer to the Phoenix Metro area? Let me know and we'd love to help you with your cleaning needs!
+
+Best,
+
+{username}"""]
     return scripts[part_list]
 
 

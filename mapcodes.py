@@ -108,10 +108,12 @@ def get_zone(address, mrkt):
         if mrkt == "PDX":
             with open('zones_output.json', 'r') as f:
                 zones = json.load(f)
-        else:
+        elif mrkt == "DFW":
             with open('dfw_zones_output.json', 'r') as f:
                 zones = json.load(f)
-
+        elif mrkt == "PHX":
+            with open('phx_zones_output.json', 'r') as f:
+                zones = json.load(f)
         latitude, longitude = 0, 0
 
         location = geocode_address_google(address)
@@ -123,8 +125,26 @@ def get_zone(address, mrkt):
             print("Address could not be geocoded.")
 
         # Convert the list of coordinates back into Polygon objects
+        # for zone in zones:
+        #     zone['polygon'] = Polygon(zone['polygon'])
+        valid_zones = []
+
         for zone in zones:
-            zone['polygon'] = Polygon(zone['polygon'])
+            coords = zone.get('polygon')
+
+            if not coords or len(coords) < 4:
+                continue
+
+            if coords[0] != coords[-1]:
+                coords.append(coords[0])
+
+            try:
+                zone['polygon'] = Polygon(coords)
+                valid_zones.append(zone)
+            except Exception:
+                continue
+
+        zones = valid_zones
 
         revised_zone_number = 0
         if location:
