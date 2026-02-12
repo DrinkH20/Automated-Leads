@@ -327,48 +327,156 @@ def run_automation():
     return template.render(emails=emails, label_id=label_id)
 
 
-def parse_email_details(text, mark):
-    # Extract name and type of service after the word "wants"
+# def parse_email_details(text, mark):
+#     # Extract name and type of service after the word "wants"
+#
+#     name_type_match = re.search(
+#         r'\s*([\w\s]+,\s*[\w\s]+)\s+wants\s+([\w\s]+)\s+cleaning', text)
+#
+#     if name_type_match:
+#         name = name_type_match.group(1).strip()
+#         service_type = name_type_match.group(2).strip()
+#     else:
+#         name = service_type = None
+#
+#     # This part needs work
+#     phone_match = re.search(r'Phone:\s*([\d\s-]+(?: x \d+)?)', text)
+#     phone = phone_match.group(1).strip() if phone_match else None
+#
+#     # Extract the email
+#     email_match = re.search(r'email:\s*([\w\.-]+@[\w\.-]+)', text)
+#     email = email_match.group(1) if email_match else None
+#
+#     # Extract SQFT
+#     sqft_match = re.search(r'SQFT: &nbsp;\s*(\d+)', text)
+#     sqft = sqft_match.group(1) if sqft_match else None
+#
+#     # Extract number of beds
+#     bed_match = re.search(r'Bed:\s*(\d+)', text)
+#     bed = bed_match.group(1) if bed_match else None
+#
+#     # Extract number of baths
+#     bath_match = re.search(r'Bath:\s*([\d\.]+)', text)
+#     bath = bath_match.group(1) if bath_match else None
+#
+#     # Extract the address
+#     address_match = re.search(r'Address:\s*(.+?)\s*(\d{5})', text)
+#     if address_match:
+#         address = f"{address_match.group(1).strip()} {address_match.group(2)}"
+#     else:
+#         address = None
+#
+#     quotes_to_run.append({"sqft": sqft, "beds": bed, "baths": bath})
+#
+#     # UTM parameters in the specified order
+#     utm_order = [
+#         'UTM4contentAdID:',
+#         'UTMreferrerURL:',
+#         'UTM1source:',
+#         'UTM2CampaignID:',
+#         'UTM3AdSetID:'
+#     ]
+#
+#     utm_value = None
+#
+#     for utm in utm_order:
+#         # Modify the regex to stop capturing at a line break or <br> (but not include <br> itself)
+#         match = re.search(rf'{utm}\s*([^\r\n<]+)', text)
+#         if match:
+#             # Check if the captured value contains a <br> and strip it off if present
+#             utm_value = match.group(1).split('<br>')[0].strip()
+#             if utm_value != "":
+#                 break
+#
+#     print("DEBUG NAME:", name)
+#     print("DEBUG ADDRESS RAW:", address)
+#     print("DEBUG ZIP:", mark)
+#
+#     if not address or "undefined" in address.lower():
+#         address = zip_code
+#
+#     return name, service_type, email, sqft, bed, bath, get_zone(address, mark), phone, utm_value
+#     # return name, service_type, email, sqft, bed, bath, get_zone(address), utm_value
 
+def parse_email_details(text, mark):
+    import re
+
+    # Normalize HTML breaks and spacing
+    cleaned = text.replace("&nbsp;", " ")
+    cleaned = cleaned.replace("<br>", "\n")
+
+    # ------------------------
+    # Name + Service
+    # ------------------------
     name_type_match = re.search(
-        r'\s*([\w\s]+,\s*[\w\s]+)\s+wants\s+([\w\s]+)\s+cleaning', text)
+        r'\s*([\w\s]+,\s*[\w\s]+)\s+wants\s+([\w\s]+)\s+cleaning',
+        cleaned
+    )
 
     if name_type_match:
         name = name_type_match.group(1).strip()
         service_type = name_type_match.group(2).strip()
     else:
-        name = service_type = None
+        name = None
+        service_type = None
 
-    # This part needs work
-    phone_match = re.search(r'Phone:\s*([\d\s-]+(?: x \d+)?)', text)
+    # ------------------------
+    # Phone
+    # ------------------------
+    phone_match = re.search(r'Phone:\s*([\d\s\-x]+)', cleaned)
     phone = phone_match.group(1).strip() if phone_match else None
 
-    # Extract the email
-    email_match = re.search(r'email:\s*([\w\.-]+@[\w\.-]+)', text)
+    # ------------------------
+    # Email
+    # ------------------------
+    email_match = re.search(r'email:\s*([\w\.-]+@[\w\.-]+)', cleaned, re.IGNORECASE)
     email = email_match.group(1) if email_match else None
 
-    # Extract SQFT
-    sqft_match = re.search(r'SQFT: &nbsp;\s*(\d+)', text)
+    # ------------------------
+    # SQFT / Beds / Baths
+    # ------------------------
+    sqft_match = re.search(r'SQFT:\s*(\d+)', cleaned)
     sqft = sqft_match.group(1) if sqft_match else None
 
-    # Extract number of beds
-    bed_match = re.search(r'Bed:\s*(\d+)', text)
+    bed_match = re.search(r'Bed:\s*(\d+)', cleaned)
     bed = bed_match.group(1) if bed_match else None
 
-    # Extract number of baths
-    bath_match = re.search(r'Bath:\s*([\d\.]+)', text)
+    bath_match = re.search(r'Bath:\s*([\d\.]+)', cleaned)
     bath = bath_match.group(1) if bath_match else None
 
-    # Extract the address
-    address_match = re.search(r'Address:\s*(.+?)\s*(\d{5})', text)
-    if address_match:
-        address = f"{address_match.group(1).strip()} {address_match.group(2)}"
-    else:
-        address = None
+    # ------------------------
+    # ZIP (always extract separately)
+    # ------------------------
+    zip_match = re.search(r'\b(\d{5})\b', cleaned)
+    zip_code = zip_match.group(1) if zip_match else None
 
-    quotes_to_run.append({"sqft": sqft, "beds": bed, "baths": bath})
+    # ------------------------
+    # Address extraction
+    # ------------------------
+    address = None
 
-    # UTM parameters in the specified order
+    address_block = re.search(r'Address:\s*(.+)', cleaned)
+    if address_block:
+        possible = address_block.group(1).strip()
+
+        # Remove line breaks
+        possible = possible.split("\n")[0].strip()
+
+        if possible.lower() != "undefined":
+            address = possible
+
+    # Fallback: if no usable street address, use ZIP
+    if not address and zip_code:
+        address = zip_code
+
+    # Final safety check
+    if not address:
+        print("WARNING: No valid address found.")
+        return name, service_type, email, sqft, bed, bath, None, phone, None
+
+    # ------------------------
+    # UTM Extraction
+    # ------------------------
     utm_order = [
         'UTM4contentAdID:',
         'UTMreferrerURL:',
@@ -378,22 +486,24 @@ def parse_email_details(text, mark):
     ]
 
     utm_value = None
-
     for utm in utm_order:
-        # Modify the regex to stop capturing at a line break or <br> (but not include <br> itself)
-        match = re.search(rf'{utm}\s*([^\r\n<]+)', text)
+        match = re.search(rf'{utm}\s*([^\r\n<]+)', cleaned)
         if match:
-            # Check if the captured value contains a <br> and strip it off if present
-            utm_value = match.group(1).split('<br>')[0].strip()
-            if utm_value != "":
+            value = match.group(1).strip()
+            if value:
+                utm_value = value
                 break
 
+    # Debug
     print("DEBUG NAME:", name)
-    print("DEBUG ADDRESS RAW:", address)
-    print("DEBUG ZIP:", mark)
+    print("DEBUG ADDRESS FINAL:", address)
+    print("DEBUG ZIP:", zip_code)
+    print("DEBUG MARKET:", mark)
 
-    return name, service_type, email, sqft, bed, bath, get_zone(address, mark), phone, utm_value
-    # return name, service_type, email, sqft, bed, bath, get_zone(address), utm_value
+    # Get zone safely
+    zone = get_zone(address, mark)
+
+    return name, service_type, email, sqft, bed, bath, zone, phone, utm_value
 
 
 def get_cleaned_body(body):
