@@ -437,11 +437,16 @@ def create_draft(service, sender_name, sender, subject, message_text, receiver, 
         message['subject'] = subject
 
         raw = base64.urlsafe_b64encode(message.as_bytes()).decode()
-        draft_body = {'message': {'raw': raw}}
-        draft = service.users().drafts().create(userId='me', body=draft_body).execute()
-        logging.debug(f"Draft created with ID: {draft['id']}")
+        # draft_body = {'message': {'raw': raw}}
+        # draft = service.users().drafts().create(userId='me', body=draft_body).execute()
+        # logging.debug(f"Draft created with ID: {draft['id']}")
+        #
+        # message_id = draft['message']['id']
+        send_body = {'raw': raw}
+        sent_message = service.users().messages().send(userId='me', body=send_body).execute()
+        logging.debug(f"Email sent with ID: {sent_message['id']}")
 
-        message_id = draft['message']['id']
+        message_id = sent_message['id']
 
         # Ensure both labels exist
         label_ids = []
@@ -466,7 +471,7 @@ def create_draft(service, sender_name, sender, subject, message_text, receiver, 
                 apply_label_to_message(service, 'me', message_id, label_id)
 
 
-        return draft
+        return sent_message
 
     except Exception as e:
         logging.error(f"An error occurred while creating a draft: {e}")

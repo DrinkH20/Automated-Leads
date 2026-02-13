@@ -16,6 +16,10 @@ from quoting import download_all_sheets
 
 # To Auto run - crontab -e - remove the hash infront of * * * * * cd /opt/quote_engine && /opt/quote_engine/venv/bin/python autoemailing.py >> /opt/quote_engine/automation.log 2>&1
 
+# To updated - ssh root@134.209.50.116 - cd /opt/quote_engine_repo - pwd (should say /opt/quote_engine_repo) - git status - git log --oneline --graph --decorate --all -5 - git pull origin main - chmod +x deploy.sh - ./deploy.sh - tail -n 20 /opt/quote_engine_current/automation.log
+# Manually test when done - cd /opt/quote_engine_current - pwd (should say /opt/quote_engine_current) - /opt/quote_engine_current/venv/bin/python autoemailing.py
+
+
 # app = Flask(__name__)
 
 
@@ -363,15 +367,15 @@ def run_automation():
     # label_ids = get_label_ids_by_name(service, ['LeadsNotYetContacted', 'DFW', 'PHX'])
     label_ids = get_label_ids_by_name(
         service,
-        ['LeadsNotYetContacted', 'DFW', 'PHX', 'Automated Email Sent']
+        ['Automations', 'DFW', 'PHX', 'Automated Email Sent']
     )
-    lead_label_id = label_ids.get('LeadsNotYetContacted')
+    lead_label_id = label_ids.get('Automations')
     sent_label_id = label_ids.get('Automated Email Sent')
     dfw_label_id = label_ids.get('DFW')
     phx_label_id = label_ids.get('PHX')
 
     if not lead_label_id:
-        logging.error("LeadsNotYetContacted label not found.")
+        logging.error("Automations label not found.")
         return
 
     # ---- Fetch Emails ----
@@ -516,10 +520,10 @@ def run_automation():
         # Fetch both label IDs once
         label_ids = get_label_ids_by_name(
             service,
-            ["LeadsNotYetContacted", "AutomatedEmailSent"]
+            ["Automations", "AutomatedEmailSent"]
         )
 
-        remove_label_id = label_ids.get("LeadsNotYetContacted")
+        remove_label_id = label_ids.get("Automations")
         add_label_id = label_ids.get("AutomatedEmailSent")
 
         # Optional: auto-create the label if it doesn't exist
