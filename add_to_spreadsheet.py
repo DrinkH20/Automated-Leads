@@ -465,6 +465,7 @@ def create_draft(service, sender_name, sender, subject, message_text, receiver, 
             for label_id in label_ids[1:]:
                 apply_label_to_message(service, 'me', message_id, label_id)
 
+
         return draft
 
     except Exception as e:

@@ -14,6 +14,7 @@ from mapcodes import get_zone
 from add_to_spreadsheet import add_to_spreadsheet, create_draft
 from quoting import download_all_sheets
 
+# To Auto run - crontab -e - remove the hash infront of * * * * * cd /opt/quote_engine && /opt/quote_engine/venv/bin/python autoemailing.py >> /opt/quote_engine/automation.log 2>&1
 
 # app = Flask(__name__)
 
@@ -359,8 +360,13 @@ def run_automation():
     # label_ids = get_label_ids_by_name(service, ['LeadsNotYetContacted', 'DFW'])
     # lead_label_id = label_ids.get('LeadsNotYetContacted')
     # dfw_label_id = label_ids.get('DFW')
-    label_ids = get_label_ids_by_name(service, ['LeadsNotYetContacted', 'DFW', 'PHX'])
+    # label_ids = get_label_ids_by_name(service, ['LeadsNotYetContacted', 'DFW', 'PHX'])
+    label_ids = get_label_ids_by_name(
+        service,
+        ['LeadsNotYetContacted', 'DFW', 'PHX', 'Automated Email Sent']
+    )
     lead_label_id = label_ids.get('LeadsNotYetContacted')
+    sent_label_id = label_ids.get('Automated Email Sent')
     dfw_label_id = label_ids.get('DFW')
     phx_label_id = label_ids.get('PHX')
 
@@ -506,16 +512,42 @@ def run_automation():
 
     # ---- Remove Label After Processing ----
     if processed_message_ids:
+
+        # Fetch both label IDs once
+        label_ids = get_label_ids_by_name(
+            service,
+            ["LeadsNotYetContacted", "AutomatedEmailSent"]
+        )
+
+        remove_label_id = label_ids.get("LeadsNotYetContacted")
+        add_label_id = label_ids.get("AutomatedEmailSent")
+
+        # Optional: auto-create the label if it doesn't exist
+        if not add_label_id:
+            add_label_id = service.users().labels().create(
+                userId='me',
+                body={
+                    "name": "AutomatedEmailSent",
+                    "labelListVisibility": "labelShow",
+                    "messageListVisibility": "show"
+                }
+            ).execute()["id"]
+
         for msg_id in processed_message_ids:
             try:
                 service.users().messages().modify(
                     userId='me',
                     id=msg_id,
-                    body={"removeLabelIds": [lead_label_id]}
+                    body={
+                        "removeLabelIds": [remove_label_id] if remove_label_id else [],
+                        "addLabelIds": [add_label_id] if add_label_id else []
+                    }
                 ).execute()
-                logging.debug(f"Removed label from message {msg_id}")
+
+                logging.debug(f"Updated labels for message {msg_id}")
+
             except Exception as e:
-                logging.error(f"Failed removing label from {msg_id}: {e}")
+                logging.error(f"Failed to update labels for {msg_id}: {e}")
 
     logging.info("Automation run complete.")
 
@@ -695,6 +727,10 @@ def parse_email_details(text, mark):
 
     # Get zone safely
     zone = get_zone(address, mark)
+    if not zone or zone[0] in ("NA", "", None):
+        logging.debug(f"Skipping lead outside service zone: {name}")
+        print(zone)
+        return
 
     return name, service_type, email, sqft, bed, bath, zone, phone, utm_value
 
