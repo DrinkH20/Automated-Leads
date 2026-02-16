@@ -19,11 +19,17 @@ from quoting import download_all_sheets
 # To updated - ssh root@134.209.50.116 - cd /opt/quote_engine_repo - pwd (should say /opt/quote_engine_repo) - git status - git log --oneline --graph --decorate --all -5 - git pull origin main - chmod +x deploy.sh - ./deploy.sh - tail -n 20 /opt/quote_engine_current/automation.log
 # Manually test when done - cd /opt/quote_engine_current - pwd (should say /opt/quote_engine_current) - /opt/quote_engine_current/venv/bin/python autoemailing.py
 
+# quote_engine_repo      ← git lives here
+# quote_engine_releases  ← built versions
+# quote_engine_current   ← live symlink
+
 
 # app = Flask(__name__)
 
 
 # Enable logging to capture any issues
+SEND_EMAILS = True  # ← set to True when ready to send
+
 logging.basicConfig(level=logging.DEBUG)
 
 BASE_DIR = os.getenv("APP_BASE_DIR", os.path.dirname(os.path.abspath(__file__)))
@@ -499,11 +505,29 @@ def run_automation():
         draft_list = []
 
     # ---- Create Drafts ----
+    # user_info = service.users().getProfile(userId='me').execute()
+    # sender_email = user_info['emailAddress']
+    #
+    # for sub, body_text, receiver_email, lead_market in draft_list:
+    #     create_draft(
+    #         service=service,
+    #         sender_name="Clean Affinity",
+    #         sender=sender_email,
+    #         subject=sub,
+    #         message_text=body_text,
+    #         receiver=receiver_email,
+    #         area=lead_market,
+    #         label_name="Leads In Process"
+    #     )
+    # ---- Create Drafts ----
     user_info = service.users().getProfile(userId='me').execute()
     sender_email = user_info['emailAddress']
 
     for sub, body_text, receiver_email, lead_market in draft_list:
-        create_draft(
+
+        logging.info(f"Creating draft for {receiver_email}")
+
+        draft = create_draft(
             service=service,
             sender_name="Clean Affinity",
             sender=sender_email,
@@ -513,6 +537,50 @@ def run_automation():
             area=lead_market,
             label_name="Leads In Process"
         )
+
+        if SEND_EMAILS and draft:
+            draft_id = draft['id']
+
+            logging.info(f"SENDING draft to {receiver_email}")
+
+            sent = service.users().drafts().send(
+                userId='me',
+                body={'id': draft_id}
+            ).execute()
+
+            sent_message_id = sent['id']
+
+            # label_ids = get_label_ids_by_name(
+            #     service,
+            #     ["Leads In Process", "AutomatedEmailSent"]
+            # )
+            #
+            # service.users().messages().modify(
+            #     userId='me',
+            #     id=sent_message_id,
+            #     body={
+            #         "addLabelIds": list(label_ids.values())
+            #     }
+            # ).execute()
+            labels_to_apply = ["Leads In Process", "AutomatedEmailSent"]
+
+            # Add market label dynamically
+            if lead_market == "DFW":
+                labels_to_apply.append("DFW")
+            elif lead_market == "PHX":
+                labels_to_apply.append("PHX")
+            # elif lead_market == "PDX":
+            #     labels_to_apply.append("PDX")  # optional if you want it
+
+            label_ids = get_label_ids_by_name(service, labels_to_apply)
+
+            service.users().messages().modify(
+                userId='me',
+                id=sent_message_id,
+                body={
+                    "addLabelIds": list(label_ids.values())
+                }
+            ).execute()
 
     # ---- Remove Label After Processing ----
     if processed_message_ids:

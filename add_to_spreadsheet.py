@@ -210,7 +210,8 @@ def revise_list(data, mark, dfw_count, pdx_pricing, dfw_pricing):
             last_name,
             "Joel",
             city,
-            market
+            market,
+            email  # ← carry email with quote
         )
 
         if market == "PDX":
@@ -258,7 +259,7 @@ def revise_list(data, mark, dfw_count, pdx_pricing, dfw_pricing):
 
     final_outputs = []
 
-    count = 0
+    # count = 0
     for market_index, market_batch in enumerate(quotes_to_run):
 
         market_results = all_results_quotes[market_index]
@@ -281,11 +282,12 @@ def revise_list(data, mark, dfw_count, pdx_pricing, dfw_pricing):
             last_name = quote[3]
             username = quote[4]
             city = quote[5]
-            market = quote[6]  # keep original casing if you want
+            market = quote[6]
+            email = quote[7]  # ← now safe
 
-            email = revised_data[count]
-            email = email[13]
-            count += 1
+            # email = revised_data[count]
+            # email = email[13]
+            # count += 1
 
             # Pricing output for this quote
             pricing = result["output"]  # list of Decimals
@@ -442,9 +444,13 @@ def create_draft(service, sender_name, sender, subject, message_text, receiver, 
         # logging.debug(f"Draft created with ID: {draft['id']}")
         #
         # message_id = draft['message']['id']
-        send_body = {'raw': raw}
-        sent_message = service.users().messages().send(userId='me', body=send_body).execute()
-        logging.debug(f"Email sent with ID: {sent_message['id']}")
+        # send_body = {'raw': raw}
+        # sent_message = service.users().messages().send(userId='me', body=send_body).execute()
+        # logging.debug(f"Email sent with ID: {sent_message['id']}")
+        draft_body = {'message': {'raw': raw}}
+        draft = service.users().drafts().create(userId='me', body=draft_body).execute()
+        logging.info("Draft created")
+        return draft
 
         message_id = sent_message['id']
 
@@ -469,7 +475,6 @@ def create_draft(service, sender_name, sender, subject, message_text, receiver, 
             apply_label_to_message(service, 'me', message_id, label_ids[0])
             for label_id in label_ids[1:]:
                 apply_label_to_message(service, 'me', message_id, label_id)
-
 
         return sent_message
 
