@@ -2,10 +2,12 @@ import re
 import numpy as np
 import gspread
 from google.oauth2.service_account import Credentials
+import os
 
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
 TOKEN_FILE = 'token.pickle'
-CREDENTIALS_FILE = r'google_secrets.json'
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+CREDENTIALS_FILE = os.path.join(BASE_DIR, 'google_secrets.json')
 
 
 def initialize_client():

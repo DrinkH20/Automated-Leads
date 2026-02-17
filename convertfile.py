@@ -138,7 +138,7 @@ def convert_topojson_to_zones(topojson_path, output_path):
 
 
 # Example usage
-convert_topojson_to_zones("PHX Draft Map 112025.json", "phx_zones_output.json")
+convert_topojson_to_zones("Copy of PHX Draft Map 112025.json", "phx_zones_output.json")
 
 
 

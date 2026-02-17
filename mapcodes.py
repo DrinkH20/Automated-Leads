@@ -137,13 +137,13 @@ def get_zone(address, mrkt):
     city = "city"
     if address:
         if mrkt == "PDX":
-            with open('zones_output.json', 'r') as f:
+            with open(os.path.join(BASE_DIR, 'zones_output.json'), 'r') as f:
                 zones = json.load(f)
         elif mrkt == "DFW":
-            with open('dfw_zones_output.json', 'r') as f:
+            with open(os.path.join(BASE_DIR, 'dfw_zones_output.json'), 'r') as f:
                 zones = json.load(f)
         elif mrkt == "PHX":
-            with open('phx_zones_output.json', 'r') as f:
+            with open(os.path.join(BASE_DIR, 'phx_zones_output.json'), 'r') as f:
                 zones = json.load(f)
         latitude, longitude = 0, 0
 
