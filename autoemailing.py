@@ -1,10 +1,14 @@
 # from add_to_spreadsheet import update_prices
 # from flask import Flask, render_template_string, request, redirect, url_for
 from jinja2 import Template
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+API_KEY = os.getenv("GOOGLE_MAPS_API_KEY")
 from google.auth.transport.requests import Request
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
-import os
 import pickle
 import logging
 import base64

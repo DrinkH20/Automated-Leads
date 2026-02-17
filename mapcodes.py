@@ -9,6 +9,22 @@ import re
 # latitude, longitude = 0, 0
 import os
 api_key = os.getenv("GOOGLE_MAPS_API_KEY")
+import json
+
+# CACHE_FILE = "geocode_cache.json"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+CACHE_FILE = os.path.join(BASE_DIR, "geocode_cache.json")
+
+def load_cache():
+    try:
+        with open(CACHE_FILE) as f:
+            return json.load(f)
+    except:
+        return {}
+
+def save_cache(cache):
+    with open(CACHE_FILE, "w") as f:
+        json.dump(cache, f)
 
 def get_city_from_coordinates_google(latitude, longitude):
     # Replace with your Google Maps API key
@@ -40,25 +56,40 @@ def get_city_from_coordinates_google(latitude, longitude):
 #         return location.latitude, location.longitude, city
 #     else:
 #         return None
+# def geocode_address_google(address):
+#     geolocator = GoogleV3(api_key=api_key)
+#
+#     # Append "USA" to give geocoder proper context
+#     address = address.replace("<br>", " ").strip()
+#
+#     if "undefined" in address.lower():
+#         address = None
+#
+#     location = geolocator.geocode(f"{address}, USA")
+#
+#     # print(location, "this is the full addy")
+#
+#     if location:
+#         city = get_city_from_coordinates_google(location.latitude, location.longitude)
+#         # print(city, "THIS IS THE ADDY")
+#         return location.latitude, location.longitude, city
+#     else:
+#         return None
 def geocode_address_google(address):
     geolocator = GoogleV3(api_key=api_key)
 
-    # Append "USA" to give geocoder proper context
-    address = address.replace("<br>", " ").strip()
+    location = geolocator.geocode(address)
 
-    if "undefined" in address.lower():
-        address = None
-
-    location = geolocator.geocode(f"{address}, USA")
-
-    # print(location, "this is the full addy")
-
-    if location:
-        city = get_city_from_coordinates_google(location.latitude, location.longitude)
-        # print(city, "THIS IS THE ADDY")
-        return location.latitude, location.longitude, city
-    else:
+    if not location:
         return None
+
+    city = None
+    for component in location.raw.get("address_components", []):
+        if "locality" in component["types"]:
+            city = component["long_name"]
+            break
+
+    return (location.latitude, location.longitude, city)
 
 
 # Next steps
@@ -116,7 +147,8 @@ def get_zone(address, mrkt):
                 zones = json.load(f)
         latitude, longitude = 0, 0
 
-        location = geocode_address_google(address)
+        # location = geocode_address_google(address)
+        location = cached_geocode(address)
 
         if location:
             latitude, longitude, city = location
@@ -169,4 +201,31 @@ def get_zone(address, mrkt):
 
         return revised_zone_number, city
     return "No Address Found"
+
+
+cache = load_cache()
+
+def cached_geocode(address):
+    if address in cache:
+        result = cache[address]
+
+        try:
+            lat, lng, city = result
+            lat = float(lat)
+            lng = float(lng)
+            return result
+        except:
+            print("Invalid cache entry — clearing")
+            cache.pop(address, None)
+            save_cache(cache)
+
+    result = geocode_address_google(address)
+
+    if result:
+        cache[address] = result
+        save_cache(cache)
+
+    return result
+
+
 

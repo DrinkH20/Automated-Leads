@@ -8,8 +8,10 @@ token.pickle
 credentials/
 
 # Python
-__pycache__/
+__pycache__/s.path.join(os.environ
 *.pyc
+
+.env
 
 # IDE
 .idea/
