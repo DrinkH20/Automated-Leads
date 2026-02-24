@@ -132,6 +132,7 @@ def normalize_service_type(raw):
 def revise_list(data, mark, dfw_count, pdx_pricing, dfw_pricing):
 
     revised_data, draft_list = [], []
+    markets_for_rows = []  # ✅ add this
     today_date = datetime.now().strftime('%#m/%#d')
     scripts_choose = ["ONETIME", "MOVE", "WEEKLY", "BIWEEKLY", "MONTHLY"]
 
@@ -185,6 +186,7 @@ def revise_list(data, mark, dfw_count, pdx_pricing, dfw_pricing):
         except ValueError:
             stype_idx = 0
 
+        markets_for_rows.append(market)  # ✅ add this
         # Add to sheet data
         revised_data.append((
             today_date, utm_value, "Auto", "", "emailed",
@@ -339,7 +341,7 @@ def revise_list(data, mark, dfw_count, pdx_pricing, dfw_pricing):
     #
     # return revised_data
     # Don't send drafts here. Just return them.
-    return revised_data, draft_list
+    return revised_data, draft_list, markets_for_rows
 
 
 def create_label_if_not_exists(service, user_id, label_name, markt=None):
@@ -554,39 +556,78 @@ def add_to_spreadsheet(raw_data, mrkt, dfw_amount, pdx_prices, dfw_prices):
     sheet_name = 'Sheet1'
 
     # data = revise_list(raw_data, mrkt, dfw_amount, pdx_prices, dfw_prices)
-    data, draft_list = revise_list(raw_data, mrkt, dfw_amount, pdx_prices, dfw_prices)
+    # data, draft_list = revise_list(raw_data, mrkt, dfw_amount, pdx_prices, dfw_prices)
+    data, draft_list, markets_for_rows = revise_list(raw_data, mrkt, dfw_amount, pdx_prices, dfw_prices)
 
     try:
-        sheet = client.open_by_key(spreadsheet_id).worksheet(sheet_name)
-        print(f"Successfully accessed the spreadsheet '{sheet_name}'.")
+        # Group rows by market tab name (PDX / DFW / PHX)
+        rows_by_market = {"PDX": [], "DFW": [], "PHX": []}
 
-        # 🔥 Filter valid rows first
-        rows_to_insert = [item for item in data if len(item) == 18]
+        for row, mkt in zip(data, markets_for_rows):
+            mkt = (mkt or "PDX").upper()
+            if mkt not in rows_by_market:
+                mkt = "PDX"
+            if len(row) == 18:
+                rows_by_market[mkt].append(row)
 
-        if not rows_to_insert:
-            print("No valid rows to insert.")
-            return
+        gsheet = client.open_by_key(spreadsheet_id)
 
-        # 🔥 Find next available row ONCE (1 read call)
-        existing_rows = sheet.col_values(1)
-        start_row = len(existing_rows) + 1
-        end_row = start_row + len(rows_to_insert) - 1
+        for mkt, rows_to_insert in rows_by_market.items():
+            if not rows_to_insert:
+                continue
 
-        update_range = f"A{start_row}:R{end_row}"
+            try:
+                sheet = gsheet.worksheet(mkt)  # ✅ tab name matches market
+            except Exception as e:
+                print(f"ERROR: Could not find worksheet tab '{mkt}'. Create a tab named '{mkt}' in the sheet.")
+                raise
 
-        print(f"Inserting {len(rows_to_insert)} rows at once "
-              f"(Rows {start_row}–{end_row})")
+            # Next available row ONCE per tab
+            existing_rows = sheet.col_values(1)
+            start_row = len(existing_rows) + 1
+            end_row = start_row + len(rows_to_insert) - 1
 
-        # 🔥 ONE WRITE CALL
-        sheet.update(update_range, rows_to_insert, value_input_option="RAW")
+            update_range = f"A{start_row}:R{end_row}"
+            print(f"[{mkt}] Inserting {len(rows_to_insert)} rows at once (Rows {start_row}–{end_row})")
 
-        print("Data appended successfully.")
+            sheet.update(update_range, rows_to_insert, value_input_option="RAW")
 
+        print("✅ Data appended successfully by market.")
     except gspread.exceptions.SpreadsheetNotFound:
         print(f"Spreadsheet with ID '{spreadsheet_id}' not found.")
     except Exception as e:
         print(f"An error occurred: {e}")
     return draft_list
+    #     sheet = client.open_by_key(spreadsheet_id).worksheet(sheet_name)
+    #     print(f"Successfully accessed the spreadsheet '{sheet_name}'.")
+    #
+    #     # 🔥 Filter valid rows first
+    #     rows_to_insert = [item for item in data if len(item) == 18]
+    #
+    #     if not rows_to_insert:
+    #         print("No valid rows to insert.")
+    #         return
+    #
+    #     # 🔥 Find next available row ONCE (1 read call)
+    #     existing_rows = sheet.col_values(1)
+    #     start_row = len(existing_rows) + 1
+    #     end_row = start_row + len(rows_to_insert) - 1
+    #
+    #     update_range = f"A{start_row}:R{end_row}"
+    #
+    #     print(f"Inserting {len(rows_to_insert)} rows at once "
+    #           f"(Rows {start_row}–{end_row})")
+    #
+    #     # 🔥 ONE WRITE CALL
+    #     sheet.update(update_range, rows_to_insert, value_input_option="RAW")
+    #
+    #     print("Data appended successfully.")
+    #
+    # except gspread.exceptions.SpreadsheetNotFound:
+    #     print(f"Spreadsheet with ID '{spreadsheet_id}' not found.")
+    # except Exception as e:
+    #     print(f"An error occurred: {e}")
+    # return draft_list
 
 
 
