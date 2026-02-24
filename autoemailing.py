@@ -54,6 +54,35 @@ quotes_to_run = []
 
 # download_all_sheets()
 
+def clear_label_from_all_messages(service, label_id):
+    """
+    Remove a label from ALL messages that currently have it.
+    """
+    page_token = None
+
+    while True:
+        results = service.users().messages().list(
+            userId='me',
+            labelIds=[label_id],
+            pageToken=page_token
+        ).execute()
+
+        messages = results.get('messages', [])
+
+        for msg in messages:
+            try:
+                service.users().messages().modify(
+                    userId='me',
+                    id=msg['id'],
+                    body={"removeLabelIds": [label_id]}
+                ).execute()
+            except Exception as e:
+                logging.error(f"Failed to clear label on {msg['id']}: {e}")
+
+        page_token = results.get('nextPageToken')
+        if not page_token:
+            break
+
 def authenticate_gmail():
     try:
         creds = None
@@ -626,6 +655,11 @@ def run_automation():
                 logging.error(f"Failed to update labels for {msg_id}: {e}")
 
     logging.info("Automation run complete.")
+
+    # Sweep Automations queue clean
+    if lead_label_id:
+        clear_label_from_all_messages(service, lead_label_id)
+        logging.info("Cleared Automations label from all emails.")
 
 
 # def parse_email_details(text, mark):
