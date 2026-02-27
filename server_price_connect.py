@@ -7,8 +7,40 @@ import os
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
 TOKEN_FILE = 'token.pickle'
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-CREDENTIALS_FILE = os.path.join(BASE_DIR, 'google_secrets.json')
+CREDENTIALS_FILE = os.path.join(BASE_DIR, 'credentials', 'google_secrets.json')
+# CREDENTIALS_FILE = os.path.join(BASE_DIR, 'google_secrets.json')
 
+
+CLIENT = None
+SHEET_CACHE = {}
+
+def get_sheet(market):
+    global CLIENT, SHEET_CACHE
+
+    market = market.lower()
+
+    if market in SHEET_CACHE:
+        return SHEET_CACHE[market]
+
+    if CLIENT is None:
+        CLIENT = initialize_client()
+
+    MARKET_SHEETS = {
+        "pdx": "1VHiCVG3sYEwoeBHVkWruhEC5n2q5AL3K4SJzpYbj5XA",
+        "dfw": "1mYiEYwutXg5R3NAD9ymzN8SwSVRmCKtnD4M_gUDzNlQ",
+        "phx": "1C0GogsJO1kiQkf3e4Nzr5nPsFECF4QeAl5w7nRQby6c",
+    }
+
+    sheet_id = MARKET_SHEETS.get(market)
+
+    if not sheet_id:
+        raise ValueError(f"Invalid market: {market}")
+
+    gsheet = CLIENT.open_by_key(sheet_id)
+    sheet = gsheet.get_worksheet(0)
+
+    SHEET_CACHE[market] = sheet
+    return sheet
 
 def initialize_client():
     """Initializes the Google Sheets client using service account credentials."""

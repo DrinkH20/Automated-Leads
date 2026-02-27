@@ -18,6 +18,7 @@ import re
 from server_price_connect import update_servers
 import unicodedata
 from quoting import batch_get_quotes
+from script_loader import get_email_script, get_title
 
 # ot, initial, move, monthly, biweekly, weekly = 0,0,0,0,0,0
 
@@ -598,55 +599,20 @@ def add_to_spreadsheet(raw_data, mrkt, dfw_amount, pdx_prices, dfw_prices):
     except Exception as e:
         print(f"An error occurred: {e}")
     return draft_list
-    #     sheet = client.open_by_key(spreadsheet_id).worksheet(sheet_name)
-    #     print(f"Successfully accessed the spreadsheet '{sheet_name}'.")
-    #
-    #     # 🔥 Filter valid rows first
-    #     rows_to_insert = [item for item in data if len(item) == 18]
-    #
-    #     if not rows_to_insert:
-    #         print("No valid rows to insert.")
-    #         return
-    #
-    #     # 🔥 Find next available row ONCE (1 read call)
-    #     existing_rows = sheet.col_values(1)
-    #     start_row = len(existing_rows) + 1
-    #     end_row = start_row + len(rows_to_insert) - 1
-    #
-    #     update_range = f"A{start_row}:R{end_row}"
-    #
-    #     print(f"Inserting {len(rows_to_insert)} rows at once "
-    #           f"(Rows {start_row}–{end_row})")
-    #
-    #     # 🔥 ONE WRITE CALL
-    #     sheet.update(update_range, rows_to_insert, value_input_option="RAW")
-    #
-    #     print("Data appended successfully.")
-    #
-    # except gspread.exceptions.SpreadsheetNotFound:
-    #     print(f"Spreadsheet with ID '{spreadsheet_id}' not found.")
-    # except Exception as e:
-    #     print(f"An error occurred: {e}")
-    # return draft_list
-
 
 
 today = date.today()
 months_list = ("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December")
 month = months_list[today.month-1]
 
-
-# def update_prices(mark, ot, initial, move, monthly, biweekly, weekly):
-#     factors, texas_factors = update_servers(mark)
-#     set_ot, set_initial, set_move, set_monthly, set_biweekly, set_weekly = map(float, factors)
-#     # print(texas_factors)
-#     if (ot, initial, move, monthly, biweekly, weekly) == (set_ot, set_initial, set_move, set_monthly, set_biweekly,
-#                                                           set_weekly):
-#         print("No change needed")
-#     else:
-#         ot, initial, move, monthly, biweekly, weekly = set_ot, set_initial, set_move, set_monthly, set_biweekly, set_weekly
-#         print("Prices successfully updated!")
-#     return texas_factors, ot, initial, move, monthly, biweekly, weekly
+def clean_number(value):
+    """
+    Returns int if float is whole number.
+    Otherwise returns original float.
+    """
+    if isinstance(value, float) and value.is_integer():
+        return int(value)
+    return value
 
 
 def autocalc(sqft, beds, baths, type_clean_numerical, name_first, name_last, username, city, market, pricing):
@@ -663,467 +629,38 @@ def autocalc(sqft, beds, baths, type_clean_numerical, name_first, name_last, use
     else:
         elite = pricing[type_clean_price]
 
-    title = get_title(sqft, beds, baths, type_clean_numerical, name_last, name_first)
-    if market == "DFW":
-        main_info = get_quote_dfw(month, round(elite), round(ongoing), type_clean_numerical, name_first, username, city)
-    elif market == "PHX":
-        main_info = get_quote_phx(month, round(elite), round(ongoing), type_clean_numerical, name_first, username, city)
-    else:
-        main_info = get_quote(month, round(elite), round(ongoing), type_clean_numerical, name_first, username, city)
-
-    return title, main_info
-
-
-# This is all the different scripts
-def get_title(sqft, beds, baths, part_list, last, first):
-    sqft = int(sqft)
-    sqft = round(sqft/10)*10
-    beds = int(beds)
-
-    if baths == int(baths):
-        baths = int(baths)
-
-    if beds <= 1 >= baths:
-        scripts = [f"{last}, {first} - One Time Clean {sqft} sqft, {beds} Bed, {baths} Bath",
-                   f"{last}, {first} - Move Clean {sqft} sqft, {beds} Bed, {baths} Bath",
-                   f"{last}, {first} - Weekly Cleans {sqft} sqft, {beds} Bed, {baths} Bath",
-                   f"{last}, {first} - Biweekly Cleans {sqft} sqft, {beds} Bed, {baths} Bath",
-                   f"{last}, {first} - Monthly Cleans {sqft} sqft, {beds} Bed, {baths} Bath"]
-    elif beds > 1 < baths:
-        scripts = [f"{last}, {first} - One Time Clean {sqft} sqft, {beds} Beds, {baths} Baths",
-                   f"{last}, {first} - Move Clean {sqft} sqft, {beds} Beds, {baths} Baths",
-                   f"{last}, {first} - Weekly Cleans {sqft} sqft, {beds} Beds, {baths} Baths",
-                   f"{last}, {first} - Biweekly Cleans {sqft} sqft, {beds} Beds, {baths} Baths",
-                   f"{last}, {first} - Monthly Cleans {sqft} sqft, {beds} Beds, {baths} Baths"]
-    elif beds > 1 >= baths:
-        scripts = [f"{last}, {first} - One Time Clean {sqft} sqft, {beds} Beds, {baths} Bath",
-                   f"{last}, {first} - Move Clean {sqft} sqft, {beds} Beds, {baths} Bath",
-                   f"{last}, {first} - Weekly Cleans {sqft} sqft, {beds} Beds, {baths} Bath",
-                   f"{last}, {first} - Biweekly Cleans {sqft} sqft, {beds} Beds, {baths} Bath",
-                   f"{last}, {first} - Monthly Cleans {sqft} sqft, {beds} Beds, {baths} Bath"]
-    else:
-        scripts = [f"{last}, {first} - One Time Clean {sqft} sqft, {beds} Bed, {baths} Baths",
-                   f"{last}, {first} - Move Clean {sqft} sqft, {beds} Bed, {baths} Baths",
-                   f"{last}, {first} - Weekly Cleans {sqft} sqft, {beds} Bed, {baths} Baths",
-                   f"{last}, {first} - Biweekly Cleans {sqft} sqft, {beds} Bed, {baths} Baths",
-                   f"{last}, {first} - Monthly Cleans {sqft} sqft, {beds} Bed, {baths} Baths"]
-
-    return scripts[part_list]
-
-
-def get_quote(date_month, initial, recuring, part_list, name="there", username="", city=""):
-    scripts = [f"""Hi {name},
-
-We’re excited to help make your home feel fresh and spotless!
-
-Based on the info you provided and our {date_month} special, your one-time clean will be ${initial} (Includes washing all interior window panes within arms reach!)
-•	        Would you like any extras like fridge, oven, window blind or track cleaning?
-•	        Are there any other cleaning needs/notes you would like for me to add to our list?
-Please let me know if you would like to get on the schedule and if you have any preferred days/times. Our schedule fills up quickly, but we still have a few spots open in {date_month}!
-
-We look forward to cleaning for you!
-{username}""", f"""Hi {name},
-
-We’re excited to help make your home feel fresh and spotless!
-
-Based on the info you provided and our {date_month} special, your moving clean will be ${initial} (Includes washing all interior window panes within arms reach!)
-•	        Would you like any extras like fridge, oven, window blind or track cleaning?
-•	        Are there any other cleaning needs/notes you would like for me to add to our list?
-Please let me know if you would like to get on the schedule and if you have any preferred days/times. Our schedule fills up quickly, but we still have a few spots open in {date_month}!
-
-We look forward to cleaning for you!
-{username}""", f"""Hi {name}!
-
-We’re excited to help make your home feel fresh and spotless!
-
-Normally, your initial reset clean would be ${initial*2},
-but with our {date_month} special, it’s 50% off — just ${initial}. Your weekly service is ${recuring}, with the whole home cleaned every visit.
-
-Let me know if you’d like to get on the schedule and if you have any preferred days or times. Our calendar fills up quickly (especially for the longer initial clean), but we still have a few {date_month} spots available. What works best for you?
-
-We look forward to cleaning for you!
-{username}
-""", f"""Hi {name}!
-
-We’re excited to help make your home feel fresh and spotless!
-
-Normally, your initial reset clean would be ${initial*2},
-but with our {date_month} special, it’s 50% off — just ${initial}. Your biweekly service is ${recuring}, with the whole home cleaned every visit.
-
-Let me know if you’d like to get on the schedule and if you have any preferred days or times. Our calendar fills up quickly (especially for the longer initial clean), but we still have a few {date_month} spots available. What works best for you?
-
-We look forward to cleaning for you!
-{username}
-""", f"""Hi {name}!
-
-We’re excited to help make your home feel fresh and spotless!
-
-Normally, your initial reset clean would be ${initial*2},
-but with our {date_month} special, it’s 50% off — just ${initial}. Your monthly service is ${recuring}, with the whole home cleaned every visit.
-
-Let me know if you’d like to get on the schedule and if you have any preferred days or times. Our calendar fills up quickly (especially for the longer initial clean), but we still have a few {date_month} spots available. What works best for you?
-
-We look forward to cleaning for you!
-{username}
-""", f"""Hi {name},
-
-Thank you for reaching out about cleans! We'd love to help!
-
-It looks like the address you provided is in Salem which is outside of our service area. Do you have an address that is closer to the Portland Metro area? Let me know and we'd love to help you with your cleaning needs!
-
-Best,
-
-{username}"""]
-    return scripts[part_list]
-
-
-def get_quote_dfw(date_month, initial, recuring, part_list, name="there", username="", city=""):
-    scripts = [f"""Hi {name},
-    
-We’re excited to help make your home feel fresh and spotless!
-
-Based on the info you provided and our {date_month} special, your one-time clean will be ${initial} before sales tax (Includes washing all interior window panes within arms reach!)
-
-•         Would you like any extras like fridge, oven, window blind or track cleaning?
-
-•         Are there any other cleaning needs/notes you would like for me to add to our list?
-
-Every technician on our team is background-checked, highly trained, and IICRC-certified, with great communication skills — so you can count on professionalism and care with every visit.
-
-Let me know if you would like to get on the schedule and if you have any preferred days/times. Our schedule fills up quickly (especially for the longer initial clean!), but we still have a few spots in {date_month}! What works best?
-
-We look forward to cleaning for you!
-{username}""", f"""Hi {name},
-    
-We’re excited to help make your home feel fresh and spotless!
-Based on the info you provided and our {date_month} special, your moving clean will be ${initial} before sales tax (Includes washing all interior window panes within arms reach!)
-
-•         Would you like any extras like fridge, oven, window blind or track cleaning?
-
-•         Are there any other cleaning needs/notes you would like for me to add to our list?
-
-Every technician on our team is background-checked, highly trained, and IICRC-certified, with great communication skills — so you can count on professionalism and care with every visit.
-
-Let me know if you would like to get on the schedule and if you have any preferred days/times. Our schedule fills up quickly (especially for the longer initial clean!), but we still have a few spots in {date_month}! What works best?
-
-We look forward to cleaning for you!
-{username}""", f"""Hi {name},
-
-We’d love to help get your home fresh and spotless!
-
-With the special we are running for {date_month}, your first clean is ${recuring} before sales tax — the same rate as your weekly visits moving forward, with baseboards and interior windows included!
-
-All of our technicians are background-checked, highly trained, and IICRC-certified.
-
-{date_month} availability is limited — would you like me to hold an opening for you?
-
-Best,
-{username}  
-""", f"""Hi {name},
-
-We’d love to help get your home fresh and spotless!
-
-With the special we are running for {date_month}, your first clean is ${recuring} before sales tax — the same rate as your biweekly visits moving forward, with baseboards and interior windows included!
-
-All of our technicians are background-checked, highly trained, and IICRC-certified.
-
-{date_month} availability is limited — would you like me to hold an opening for you?
-
-Best,
-{username} 
-""", f"""Hi {name},
-
-We’d love to help get your home fresh and spotless!
-
-With the special we are running for {date_month}, your first clean is ${recuring} before sales tax — the same rate as your monthly visits moving forward, with baseboards and interior windows included!
-
-All of our technicians are background-checked, highly trained, and IICRC-certified.
-
-{date_month} availability is limited — would you like me to hold an opening for you?
-
-Best,
-{username}  
-""", f"""Hi {name},
-
-Thank you for reaching out about cleans! We'd love to help!
-
-It looks like the address you provided is in Salem which is outside of our service area. Do you have an address that is closer to the Portland Metro area? Let me know and we'd love to help you with your cleaning needs!
-
-Best,
-
-{username}"""]
-    return scripts[part_list]
-
-
-def get_quote_phx(date_month, initial, recuring, part_list, name="there", username="", city=""):
-    scripts = [f"""Hi {name},
-
-We’re excited to help make your home feel fresh and spotless!
-
-Based on the info you provided and our {date_month} special, your one-time clean will be ${initial} (Includes washing all interior window panes within arms reach!)
-
-•         Would you like any extras like fridge, oven, window blind or track cleaning?
-
-•         Are there any other cleaning needs/notes you would like for me to add to our list?
-
-Every technician on our team is background-checked, highly trained, and IICRC-certified, with great communication skills — so you can count on professionalism and care with every visit.
-
-Let me know if you would like to get on the schedule and if you have any preferred days/times. Our schedule fills up quickly (especially for the longer initial clean!), but we still have a few spots in {date_month}! What works best?
-
-We look forward to cleaning for you!
-{username}""", f"""Hi {name},
-
-We’re excited to help make your home feel fresh and spotless!
-Based on the info you provided and our {date_month} special, your moving clean will be ${initial} (Includes washing all interior window panes within arms reach!)
-
-•         Would you like any extras like fridge, oven, window blind or track cleaning?
-
-•         Are there any other cleaning needs/notes you would like for me to add to our list?
-
-Every technician on our team is background-checked, highly trained, and IICRC-certified, with great communication skills — so you can count on professionalism and care with every visit.
-
-Let me know if you would like to get on the schedule and if you have any preferred days/times. Our schedule fills up quickly (especially for the longer initial clean!), but we still have a few spots in {date_month}! What works best?
-
-We look forward to cleaning for you!
-{username}""", f"""Hi {name},
-
-We’d love to help get your home fresh and spotless!
-
-With the special we are running for {date_month}, your first clean is ${recuring} — the same rate as your weekly visits moving forward, with baseboards and interior windows included!
-
-All of our technicians are background-checked, highly trained, and IICRC-certified.
-
-{date_month} availability is limited — would you like me to hold an opening for you?
-
-Best,
-{username} 
-""", f"""Hi {name},
-
-We’d love to help get your home fresh and spotless!
-
-With the special we are running for {date_month}, your first clean is ${recuring} — the same rate as your biweekly visits moving forward, with baseboards and interior windows included!
-
-All of our technicians are background-checked, highly trained, and IICRC-certified.
-
-{date_month} availability is limited — would you like me to hold an opening for you?
-
-Best,
-{username} 
-""", f"""Hi {name},
-
-We’d love to help get your home fresh and spotless!
-
-With the special we are running for {date_month}, your first clean is ${recuring} — the same rate as your monthly visits moving forward, with baseboards and interior windows included!
-
-All of our technicians are background-checked, highly trained, and IICRC-certified.
-
-{date_month} availability is limited — would you like me to hold an opening for you?
-
-Best,
-{username} 
-""", f"""Hi {name},
-
-Thank you for reaching out about cleans! We'd love to help!
-
-It looks like the address you provided is in Salem which is outside of our service area. Do you have an address that is closer to the Phoenix area? Let me know and we'd love to help you with your cleaning needs!
-
-Best,
-
-{username}"""]
-    return scripts[part_list]
-
-
-def get_title_manual(sqft, beds, baths, part_list):
-    sqft = int(sqft)
-    sqft = round(sqft / 10) * 10
-    beds = int(beds)
-    try:
-        baths = int(baths)
-    except ValueError:
-        baths = float(baths)
-
-    if beds <= 1 >= baths:
-        scripts = [f"One Time Clean {sqft} sqft, {beds} Bed, {baths} Bath",
-                   f"Move Clean {sqft} sqft, {beds} Bed, {baths} Bath",
-                   f"Weekly Cleans {sqft} sqft, {beds} Bed, {baths} Bath",
-                   f"Biweekly Cleans {sqft} sqft, {beds} Bed, {baths} Bath",
-                   f"Monthly Cleans {sqft} sqft, {beds} Bed, {baths} Bath"]
-    elif beds > 1 < baths:
-        scripts = [f"One Time Clean {sqft} sqft, {beds} Beds, {baths} Baths",
-                   f"Move Clean {sqft} sqft, {beds} Beds, {baths} Baths",
-                   f"Weekly Cleans {sqft} sqft, {beds} Beds, {baths} Baths",
-                   f"Biweekly Cleans {sqft} sqft, {beds} Beds, {baths} Baths",
-                   f"Monthly Cleans {sqft} sqft, {beds} Beds, {baths} Baths"]
-    elif beds > 1 >= baths:
-        scripts = [f"One Time Clean {sqft} sqft, {beds} Beds, {baths} Bath",
-                   f"Move Clean {sqft} sqft, {beds} Beds, {baths} Bath",
-                   f"Weekly Cleans {sqft} sqft, {beds} Beds, {baths} Bath",
-                   f"Biweekly Cleans {sqft} sqft, {beds} Beds, {baths} Bath",
-                   f"Monthly Cleans {sqft} sqft, {beds} Beds, {baths} Bath"]
-    else:
-        scripts = [f"One Time Clean {sqft} sqft, {beds} Bed, {baths} Baths",
-                   f"Move Clean {sqft} sqft, {beds} Bed, {baths} Baths",
-                   f"Weekly Cleans {sqft} sqft, {beds} Bed, {baths} Baths",
-                   f"Biweekly Cleans {sqft} sqft, {beds} Bed, {baths} Baths",
-                   f"Monthly Cleans {sqft} sqft, {beds} Bed, {baths} Baths"]
-
-    return scripts[part_list]
-
-
-def get_quote_text(date_month, initial, recuring, part_list, name="there", username="", sqft=0, beds=0, baths=0):
-    scripts = [f"""H {name}! {username} with Clean Affinity here! 
-Thank you for reaching out! 
-
-Based on your address it looks like {sqft} sqft, with {beds} beds and {baths} baths. If that’s correct, your one-time clean will be ${initial} with our {date_month} special. 
-
-Is this something I can get on the schedule for you?
-""", f"""Hi {name}! {username} with Clean Affinity here! 
-Thank you for reaching out! 
-
-Based on your address it looks like {sqft} sqft, with {beds} beds and {baths} baths. If that’s correct, your moving clean will be ${initial} with our {date_month} special. 
-
-Is this something I can get on the schedule for you?
-""", f"""Hi {name}! {username} with Clean Affinity here! 
-Thank you for reaching out! 
-
-Based on your address it looks like {sqft} sqft, with {beds} beds and {baths} baths. If that’s correct, your initial clean will be ${initial} and the following weekly cleans will be ${recuring} with our {date_month} special. 
-
-Is this something I can get on the schedule for you?
-""", f"""Hi {name}! {username} with Clean Affinity here! 
-Thank you for reaching out! 
-
-Based on your address it looks like {sqft} sqft, with {beds} beds and {baths} baths. If that’s correct, your initial clean will be ${initial} and the following biweekly cleans will be ${recuring} with our {date_month} special. 
-
-Is this something I can get on the schedule for you?
-""", f"""Hi {name}! {username} with Clean Affinity here! 
-Thank you for reaching out! 
-
-Based on your address it looks like {sqft} sqft, with {beds} beds and {baths} baths. If that’s correct, your initial clean will be ${initial} and the following monthly cleans will be ${recuring} with our {date_month} special. 
-
-Is this something I can get on the schedule for you?
-"""]
-    return scripts[part_list]
-
-
-def get_quote_text_dfw(date_month, initial, recuring, part_list, name="there", username="", sqft=0, beds=0, baths=0):
-    scripts = [f"""Hi {name}! {username} with Clean Affinity here
-
-Thanks for reaching out! For your {sqft} sqft home ({beds} beds, {baths} baths), your Elite one-time clean is ${initial} before sales tax with our {date_month} special — a full reset with interior windows and baseboards included so it feels fresh again.
-
-Most clients book this when they want things spotless without giving up their weekend.
-
-We also offer extras like fridge, oven, blinds, or track cleaning — would a morning or afternoon spot work better for you?
-""", f"""Hi {name}! {username} with Clean Affinity here
-
-Thanks for reaching out! For your {sqft} sqft home ({beds} beds, {baths} baths), your moving clean is ${initial} before sales tax with our {date_month} special — a full reset that includes interior windows and all reachable cabinet interiors so it feels brand new again.
-
-Most clients book this when they want things spotless without giving up their weekend.
-
-We also offer extras like fridge, oven, blinds, or track cleaning — would a morning or afternoon spot work better for you?
-""", f"""Hi {name}, this is {username} with Clean Affinity!
-
-For your {sqft} sq ft, {beds} bed / {baths} bath home:
-
-Your first clean is ${recuring} before sales tax with our {date_month} special — the same rate as your weekly cleans moving forward. (Baseboards and interior windows are included)
-
-All our technicians are background-checked, highly trained, and IICRC-certified.
-
-We only have a few {date_month} openings left — would you like me to hold one for you?
-""", f"""Hi {name}, this is {username} with Clean Affinity!
-
-For your {sqft} sq ft, {beds} bed / {baths} bath home:
-
-Your first clean is ${recuring} before sales tax with our {date_month} special — the same rate as your biweekly cleans moving forward. (Baseboards and interior windows are included)
-
-All our technicians are background-checked, highly trained, and IICRC-certified.
-
-We only have a few {date_month} openings left — would you like me to hold one for you?
-""", f"""Hi {name}, this is {username} with Clean Affinity!
-
-For your {sqft} sq ft, {beds} bed / {baths} bath home:
-
-Your first clean is ${recuring} before sales tax with our {date_month} special — the same rate as your monthly cleans moving forward. (Baseboards and interior windows are included)
-
-All our technicians are background-checked, highly trained, and IICRC-certified.
-
-We only have a few {date_month} openings left — would you like me to hold one for you? 
-""", f"""# Hi {name},
-
-Thank you for reaching out about cleans! We'd love to help!
-
-It looks like the address you provided is in Salem which is outside of our service area. Do you have an address that is closer to the Portland Metro area? Let me know and we'd love to help you with your cleaning needs!
-
-Best,
-
-{username}"""]
-    return scripts[part_list]
-
-
-def get_quote_text_phx(date_month, initial, recuring, part_list, name="there", username="", sqft=0, beds=0, baths=0):
-    scripts = [f"""Hi {name}! {username} with Clean Affinity here
-
-Thanks for reaching out! For your {sqft} sqft home ({beds} beds, {baths} baths), your Elite one-time clean is ${initial} with our {date_month} special — a full reset with interior windows and baseboards included so it feels fresh again.
-
-Most clients book this when they want things spotless without giving up their weekend.
-
-We also offer extras like fridge, oven, blinds, or track cleaning — would a morning or afternoon spot work better for you?
-""", f"""Hi {name}! {username} with Clean Affinity here
-
-Thanks for reaching out! For your {sqft} sqft home ({beds} beds, {baths} baths), your moving clean is ${initial} with our {date_month} special — a full reset that includes interior windows and all reachable cabinet interiors so it feels brand new again.
-
-Most clients book this when they want things spotless without giving up their weekend.
-
-We also offer extras like fridge, oven, blinds, or track cleaning — would a morning or afternoon spot work better for you?
-""", f"""Hi {name}, this is {username} with Clean Affinity!
-
-For your {sqft} sq ft, {beds} bed / {baths} bath home:
-
-Your first clean is ${recuring} with our {date_month} special — the same rate as your weekly cleans moving forward. (Baseboards and interior windows are included)
-
-All our technicians are background-checked, highly trained, and IICRC-certified.
-
-We only have a few {date_month} openings left — would you like me to hold one for you?
-""", f"""Hi {name}, this is {username} with Clean Affinity!
-
-For your {sqft} sq ft, {beds} bed / {baths} bath home:
-
-Your first clean is ${recuring} with our {date_month} special — the same rate as your biweekly cleans moving forward. (Baseboards and interior windows are included)
-
-All our technicians are background-checked, highly trained, and IICRC-certified.
-
-We only have a few {date_month} openings left — would you like me to hold one for you?
-""", f"""Hi {name}, this is {username} with Clean Affinity!
-
-For your {sqft} sq ft, {beds} bed / {baths} bath home:
-
-Your first clean is ${recuring} with our {date_month} special — the same rate as your monthly cleans moving forward. (Baseboards and interior windows are included)
-
-All our technicians are background-checked, highly trained, and IICRC-certified.
-
-We only have a few {date_month} openings left — would you like me to hold one for you?
-""", f"""# Hi {name},
-
-Thank you for reaching out about cleans! We'd love to help!
-
-It looks like the address you provided is in Salem which is outside of our service area. Do you have an address that is closer to the Phoenix Metro area? Let me know and we'd love to help you with your cleaning needs!
-
-Best,
-
-{username}"""]
-    return scripts[part_list]
-
-
-def failed(date_month, username=""):
-    scripts = f"""Hi there!
-
-We’re excited to help make your home feel fresh and spotless!
-
-Could you provide the number of bedrooms and bathrooms along with the square footage of the house so I can put a quote together for you?
-
-Please let me know if you have any preferred days/times. Our schedule fills up quickly (especially for the longer initial clean!), but we still have a few spots in {date_month}!
-
-We look forward to cleaning for you!
-
-{username}
-"""
-    return scripts
+    name_section = ""
+    if name_first.strip() and name_first.strip():
+        name_section = f"{name_last}, {name_first} - "
+
+    TYPE_MAP = {
+        1: "INITIAL",
+        2: "WEEKLY",
+        3: "BIWEEKLY",
+        4: "MONTHLY",
+    }
+
+    type_string = TYPE_MAP.get(type_clean_numerical)
+
+    title_template = get_title("quote_text", market, type_string)
+    body_template = get_email_script("quote_text", market, type_clean)
+
+    body = body_template.format(
+        name=name_first,
+        last=name_last,
+        first=name_first,
+        date_month=month,
+        initial=round(elite),  # discounted
+        initial_full=round(elite * 2),  # FULL price before discount
+        recurring=round(ongoing),
+        username=username
+    )
+
+    title = title_template.format(
+        name_section=name_section,
+        sqft=sqft,
+        beds=clean_number(beds),
+        baths=clean_number(baths)
+    )
+
+    return title, body

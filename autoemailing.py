@@ -16,7 +16,6 @@ from email.mime.text import MIMEText
 import re
 from mapcodes import get_zone
 from add_to_spreadsheet import add_to_spreadsheet, create_draft
-from quoting import download_all_sheets
 
 # To Auto run - crontab -e - remove the hash infront of * * * * * cd /opt/quote_engine && /opt/quote_engine/venv/bin/python autoemailing.py >> /opt/quote_engine/automation.log 2>&1
 
@@ -29,7 +28,6 @@ from quoting import download_all_sheets
 
 
 # app = Flask(__name__)
-
 
 # Enable logging to capture any issues
 SEND_EMAILS = True  # ← set to True when ready to send
@@ -212,183 +210,6 @@ def decode_base64(data):
     decoded_bytes = base64.urlsafe_b64decode(data.encode('UTF-8'))
     return decoded_bytes.decode('UTF-8')
 
-
-# @app.route('/')
-# def index():
-# def run_automation():
-#     creds = authenticate_gmail()
-#     if not creds:
-#         return "Failed to authenticate with Gmail."
-#
-#     service = build('gmail', 'v1', credentials=creds, cache_discovery=False)
-#     logging.debug("Gmail service created successfully.")
-#
-#     label_name = 'LeadsNotYetContacted'
-#     label_id = get_label_id(service, label_name)
-#     label_names_needed = ['LeadsNotYetContacted', 'DFW']
-#     label_ids = get_label_ids_by_name(service, label_names_needed)
-#
-#     lead_label_id = label_ids.get('LeadsNotYetContacted')
-#     dfw_label_id = label_ids.get('DFW')
-#
-#     if not label_id:
-#         return f"Label '{label_name}' not found."
-#
-#     all_leads = []
-#     processed_message_ids = []
-#     lead_emails_for_doubles = []
-#     lead_type_for_doubles = []
-#
-#     # emails, dfw_emails = fetch_emails(service, label_id=label_id)
-#     emails, dfw_emails = fetch_emails(service, label_id=lead_label_id, dfw_label_id=dfw_label_id)
-#
-#     chart_of_profitable = ['weekly', 'biweekly', 'monthly', 'move', 'onetime']
-#     ot = initial = move = monthly = biweekly = weekly = 0
-#     market = "PDX"
-#
-#     pricing_pdx = {
-#         'ot': ot,
-#         'initial': initial,
-#         'move': move,
-#         'monthly': monthly,
-#         'biweekly': biweekly,
-#         'weekly': weekly
-#     }
-#     # --- Process PDX emails first ---
-#     emails_markets = []
-#     for i in emails:
-#         if 'body' not in i:
-#             continue
-#         check_first = parse_email_details(get_cleaned_body(i['body']), market)
-#         last_lead = check_first
-#         try:
-#             state_parts = last_lead[6]
-#             in_zone = int(state_parts[0])
-#             if in_zone > 0 and int(last_lead[4]) > 0:
-#                 if last_lead[2] in lead_emails_for_doubles:
-#                     idx = lead_emails_for_doubles.index(last_lead[2])
-#                     if chart_of_profitable.index(last_lead[1]) < chart_of_profitable.index(lead_type_for_doubles[idx]):
-#                         all_leads.pop(idx)
-#                         lead_emails_for_doubles.pop(idx)
-#                         lead_type_for_doubles.pop(idx)
-#
-#                         all_leads.append(check_first)
-#                         processed_message_ids.append(i['id'])
-#
-#                         lead_emails_for_doubles.append(last_lead[2])
-#                         lead_type_for_doubles.append(last_lead[1])
-#                         print("Removed duplicate lead and replaced with better one.")
-#                     else:
-#                         print("Did not add because of better duplicate.")
-#                 else:
-#                     all_leads.append(check_first)
-#                     processed_message_ids.append(i['id'])
-#
-#                     lead_emails_for_doubles.append(last_lead[2])
-#                     lead_type_for_doubles.append(last_lead[1])
-#                     # print("doubles", lead_emails_for_doubles) 1/22/2026
-#                     # print("types", lead_type_for_doubles)
-#         except (TypeError, ValueError):
-#             print("Skipped due to invalid zone or lead info.")
-#
-#     # --- Now process DFW emails separately ---
-#     market = "DFW"
-#
-#     pricing_dfw = {
-#         'ot': ot,
-#         'initial': initial,
-#         'move': move,
-#         'monthly': monthly,
-#         'biweekly': biweekly,
-#         'weekly': weekly
-#     }
-#
-#     before_dfw_len = len(all_leads)
-#     for i in dfw_emails:
-#         if 'body' not in i:
-#             continue
-#         check_first = parse_email_details(get_cleaned_body(i['body']), market)
-#         last_lead = check_first
-#         try:
-#             state_parts = last_lead[6]
-#             in_zone = int(state_parts[0])
-#             if in_zone > 0 and int(last_lead[4]) > 0:
-#                 if last_lead[2] in lead_emails_for_doubles:
-#                     idx = lead_emails_for_doubles.index(last_lead[2])
-#                     if chart_of_profitable.index(last_lead[1]) < chart_of_profitable.index(lead_type_for_doubles[idx]):
-#                         all_leads.pop(idx)
-#                         lead_emails_for_doubles.pop(idx)
-#                         lead_type_for_doubles.pop(idx)
-#
-#                         all_leads.append(check_first)
-#                         processed_message_ids.append(i['id'])
-#
-#                         lead_emails_for_doubles.append(last_lead[2])
-#                         lead_type_for_doubles.append(last_lead[1])
-#                         print("Removed duplicate lead and replaced with better one (DFW).")
-#                     else:
-#                         print("Did not add (DFW) due to better duplicate.")
-#                 else:
-#                     all_leads.append(check_first)
-#                     processed_message_ids.append(i['id'])
-#
-#                     lead_emails_for_doubles.append(last_lead[2])
-#                     lead_type_for_doubles.append(last_lead[1])
-#         except (TypeError, ValueError):
-#             print("Skipped (DFW) due to invalid zone or lead info.")
-#
-#     # Final push to spreadsheet
-#     after_dfw_len = len(all_leads)
-#     total_dfw_leads = after_dfw_len - before_dfw_len
-#     # add_to_spreadsheet(all_leads, market, total_dfw_leads, pricing_pdx, pricing_dfw)
-#     draft_list = add_to_spreadsheet(all_leads, market, total_dfw_leads, pricing_pdx, pricing_dfw)
-#
-#     # Create Gmail drafts using the *same* authenticated service
-#     user_info = service.users().getProfile(userId='me').execute()
-#     sender_email = user_info['emailAddress']
-#
-#     for sub, body_text, receiver_email, lead_market in draft_list:
-#         create_draft(
-#             service=service,
-#             sender_name="Clean Affinity",
-#             sender=sender_email,
-#             subject=sub,
-#             message_text=body_text,
-#             receiver=receiver_email,
-#             area=lead_market,  # "PDX"/"DFW"/"PHX"
-#             label_name="Leads In Process"
-#         )
-#
-#     # Remove LeadsNotYetContacted label after successful processing
-#     if processed_message_ids:
-#         label_id = get_label_id(service, "LeadsNotYetContacted")
-#
-#         if label_id:
-#             for msg_id in processed_message_ids:
-#                 try:
-#                     service.users().messages().modify(
-#                         userId='me',
-#                         id=msg_id,
-#                         body={"removeLabelIds": [label_id]}
-#                     ).execute()
-#                     logging.debug(f"Removed label from message {msg_id}")
-#                 except Exception as e:
-#                     logging.error(f"Failed to remove label from {msg_id}: {e}")
-#
-#     html_template = """
-#         <h1>Latest Emails from {{ label_id }}</h1>
-#         <ul>
-#             {% for email in emails %}
-#                 <li>
-#                     <h3>{{ email.subject }}</h3>
-#                     <p>{{ email.body }}</p>
-#                 </li>
-#             {% endfor %}
-#         </ul>
-#         """
-#
-#     template = Template(html_template)
-#     return template.render(emails=emails, label_id=label_id)
 
 def run_automation():
     creds = authenticate_gmail()
@@ -662,77 +483,6 @@ def run_automation():
         logging.info("Cleared Automations label from all emails.")
 
 
-# def parse_email_details(text, mark):
-#     # Extract name and type of service after the word "wants"
-#
-#     name_type_match = re.search(
-#         r'\s*([\w\s]+,\s*[\w\s]+)\s+wants\s+([\w\s]+)\s+cleaning', text)
-#
-#     if name_type_match:
-#         name = name_type_match.group(1).strip()
-#         service_type = name_type_match.group(2).strip()
-#     else:
-#         name = service_type = None
-#
-#     # This part needs work
-#     phone_match = re.search(r'Phone:\s*([\d\s-]+(?: x \d+)?)', text)
-#     phone = phone_match.group(1).strip() if phone_match else None
-#
-#     # Extract the email
-#     email_match = re.search(r'email:\s*([\w\.-]+@[\w\.-]+)', text)
-#     email = email_match.group(1) if email_match else None
-#
-#     # Extract SQFT
-#     sqft_match = re.search(r'SQFT: &nbsp;\s*(\d+)', text)
-#     sqft = sqft_match.group(1) if sqft_match else None
-#
-#     # Extract number of beds
-#     bed_match = re.search(r'Bed:\s*(\d+)', text)
-#     bed = bed_match.group(1) if bed_match else None
-#
-#     # Extract number of baths
-#     bath_match = re.search(r'Bath:\s*([\d\.]+)', text)
-#     bath = bath_match.group(1) if bath_match else None
-#
-#     # Extract the address
-#     address_match = re.search(r'Address:\s*(.+?)\s*(\d{5})', text)
-#     if address_match:
-#         address = f"{address_match.group(1).strip()} {address_match.group(2)}"
-#     else:
-#         address = None
-#
-#     quotes_to_run.append({"sqft": sqft, "beds": bed, "baths": bath})
-#
-#     # UTM parameters in the specified order
-#     utm_order = [
-#         'UTM4contentAdID:',
-#         'UTMreferrerURL:',
-#         'UTM1source:',
-#         'UTM2CampaignID:',
-#         'UTM3AdSetID:'
-#     ]
-#
-#     utm_value = None
-#
-#     for utm in utm_order:
-#         # Modify the regex to stop capturing at a line break or <br> (but not include <br> itself)
-#         match = re.search(rf'{utm}\s*([^\r\n<]+)', text)
-#         if match:
-#             # Check if the captured value contains a <br> and strip it off if present
-#             utm_value = match.group(1).split('<br>')[0].strip()
-#             if utm_value != "":
-#                 break
-#
-#     print("DEBUG NAME:", name)
-#     print("DEBUG ADDRESS RAW:", address)
-#     print("DEBUG ZIP:", mark)
-#
-#     if not address or "undefined" in address.lower():
-#         address = zip_code
-#
-#     return name, service_type, email, sqft, bed, bath, get_zone(address, mark), phone, utm_value
-#     # return name, service_type, email, sqft, bed, bath, get_zone(address), utm_value
-
 def parse_email_details(text, mark):
     import re
 
@@ -829,11 +579,6 @@ def parse_email_details(text, mark):
                 utm_value = value
                 break
 
-    # Debug
-    print("DEBUG NAME:", name)
-    print("DEBUG ADDRESS FINAL:", address)
-    print("DEBUG ZIP:", zip_code)
-    print("DEBUG MARKET:", mark)
 
     # Get zone safely
     zone = get_zone(address, mark)
@@ -881,5 +626,8 @@ def get_label_id(service, label_name):
 #     app.run(debug=True, port=5200)
 
 
+from warmup import preload_all
+
 if __name__ == "__main__":
+    preload_all()
     run_automation()
