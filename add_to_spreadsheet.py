@@ -633,8 +633,12 @@ def autocalc(sqft, beds, baths, type_clean_numerical, name_first, name_last, use
     if name_first.strip() and name_first.strip():
         name_section = f"{name_last}, {name_first} - "
 
-    title_template = get_title("quote_text", market, type_clean)
-    body_template = get_email_script("quote_text", market, type_clean)
+    send_type_clean = type_clean
+    if type_clean == "ot":
+        send_type_clean = "onetime"
+
+    title_template = get_title("quote_text", market, send_type_clean)
+    body_template = get_email_script("quote_text", market, send_type_clean)
 
     body = body_template.format(
         name=name_first,
