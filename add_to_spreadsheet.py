@@ -633,16 +633,7 @@ def autocalc(sqft, beds, baths, type_clean_numerical, name_first, name_last, use
     if name_first.strip() and name_first.strip():
         name_section = f"{name_last}, {name_first} - "
 
-    TYPE_MAP = {
-        1: "INITIAL",
-        2: "WEEKLY",
-        3: "BIWEEKLY",
-        4: "MONTHLY",
-    }
-
-    type_string = TYPE_MAP.get(type_clean_numerical)
-
-    title_template = get_title("quote_text", market, type_string)
+    title_template = get_title("quote_text", market, type_clean)
     body_template = get_email_script("quote_text", market, type_clean)
 
     body = body_template.format(
