@@ -494,7 +494,7 @@ def parse_email_details(text, mark):
     # Name + Service
     # ------------------------
     name_type_match = re.search(
-        r'\s*([\w\s]+,\s*[\w\s]+)\s+wants\s+([\w\s]+)\s+cleaning',
+        r'\s*([\w\s]+,\s*[\w\s()]+)\s+wants\s+([\w\s]+)\s+cleaning',
         cleaned
     )
 
