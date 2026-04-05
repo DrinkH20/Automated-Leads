@@ -302,6 +302,10 @@ def run_automation():
                         seen_leads[email] = lead
                         processed_message_ids.append(msg['id'])
                         logging.debug("Replaced duplicate with more profitable lead.")
+                    else:
+                        # Keep existing lead but still mark this message as processed
+                        # so its Automations label gets removed
+                        processed_message_ids.append(msg['id'])
                 else:
                     all_leads.append(lead)
                     seen_leads[email] = lead
@@ -381,60 +385,52 @@ def run_automation():
 
         logging.info(f"Creating draft for {receiver_email}")
 
-        draft = create_draft(
-            service=service,
-            sender_name="Clean Affinity",
-            sender=sender_email,
-            subject=sub,
-            message_text=body_text,
-            receiver=receiver_email,
-            area=lead_market,
-            label_name="Leads In Process"
-        )
+        try:
+            draft = create_draft(
+                service=service,
+                sender_name="Clean Affinity",
+                sender=sender_email,
+                subject=sub,
+                message_text=body_text,
+                receiver=receiver_email,
+                area=lead_market,
+                label_name="Leads In Process"
+            )
 
-        if SEND_EMAILS and draft:
-            draft_id = draft['id']
+            if SEND_EMAILS and draft:
+                draft_id = draft['id']
 
-            logging.info(f"SENDING draft to {receiver_email}")
+                logging.info(f"SENDING draft to {receiver_email}")
 
-            sent = service.users().drafts().send(
-                userId='me',
-                body={'id': draft_id}
-            ).execute()
+                sent = service.users().drafts().send(
+                    userId='me',
+                    body={'id': draft_id}
+                ).execute()
 
-            sent_message_id = sent['id']
+                sent_message_id = sent['id']
 
-            # label_ids = get_label_ids_by_name(
-            #     service,
-            #     ["Leads In Process", "AutomatedEmailSent"]
-            # )
-            #
-            # service.users().messages().modify(
-            #     userId='me',
-            #     id=sent_message_id,
-            #     body={
-            #         "addLabelIds": list(label_ids.values())
-            #     }
-            # ).execute()
-            labels_to_apply = ["Leads In Process", "AutomatedEmailSent"]
+                labels_to_apply = ["Leads In Process", "AutomatedEmailSent"]
 
-            # Add market label dynamically
-            if lead_market == "DFW":
-                labels_to_apply.append("DFW")
-            elif lead_market == "PHX":
-                labels_to_apply.append("PHX")
-            # elif lead_market == "PDX":
-            #     labels_to_apply.append("PDX")  # optional if you want it
+                # Add market label dynamically
+                if lead_market == "DFW":
+                    labels_to_apply.append("DFW")
+                elif lead_market == "PHX":
+                    labels_to_apply.append("PHX")
+                # elif lead_market == "PDX":
+                #     labels_to_apply.append("PDX")  # optional if you want it
 
-            label_ids = get_label_ids_by_name(service, labels_to_apply)
+                label_ids_for_sent = get_label_ids_by_name(service, labels_to_apply)
 
-            service.users().messages().modify(
-                userId='me',
-                id=sent_message_id,
-                body={
-                    "addLabelIds": list(label_ids.values())
-                }
-            ).execute()
+                service.users().messages().modify(
+                    userId='me',
+                    id=sent_message_id,
+                    body={
+                        "addLabelIds": list(label_ids_for_sent.values())
+                    }
+                ).execute()
+
+        except Exception as e:
+            logging.error(f"Failed to send/label email to {receiver_email}: {e}")
 
     # ---- Remove Label After Processing ----
     if processed_message_ids:
