@@ -186,13 +186,11 @@ def get_zone(address, mrkt):
                 # Remove 'far' (case-insensitive) and trim whitespace
                 cleaned_zone = re.sub(r'(?i)\bfar\b', '', zone_name).strip()
 
-                # Extract first integer from the zone name
-                match = re.search(r'\d+', cleaned_zone)
-                if match:
-                    revised_zone_number = int(match.group())
+                if cleaned_zone:
+                    revised_zone_number = cleaned_zone
                 else:
                     revised_zone_number = "NA"
-                    print(f"Zone name found but no number extracted: '{zone_name}'")
+                    print(f"Zone name found but nothing remained after cleaning: '{zone_name}'")
             else:
                 revised_zone_number = "NA"
                 print(f"The address is not in any defined zone.")
