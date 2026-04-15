@@ -1,6 +1,6 @@
 [
   {
-    "name": "Zone 1",
+    "name": "1",
     "polygon": [
       [
         -122.71928826545539,
@@ -41,7 +41,7 @@
     ]
   },
   {
-    "name": "Zone 2",
+    "name": "2",
     "polygon": [
       [
         -122.59436646245005,
@@ -82,7 +82,7 @@
     ]
   },
   {
-    "name": "Zone 12",
+    "name": "12",
     "polygon": [
       [
         -122.7510306908092,
@@ -107,7 +107,7 @@
     ]
   },
   {
-    "name": "Zone 13",
+    "name": "13",
     "polygon": [
       [
         -122.60255805608975,
@@ -136,7 +136,7 @@
     ]
   },
   {
-    "name": "Zone 4",
+    "name": "4",
     "polygon": [
       [
         -122.65682736395271,
@@ -161,7 +161,7 @@
     ]
   },
   {
-    "name": "Zone 6\u00a0 - SE Portland",
+    "name": "6",
     "polygon": [
       [
         -122.56467193550617,
@@ -198,7 +198,7 @@
     ]
   },
   {
-    "name": "Zone 5 - SW Portland",
+    "name": "5",
     "polygon": [
       [
         -122.70597692579088,
@@ -267,7 +267,7 @@
     ]
   },
   {
-    "name": "Zone 8- Happy Valley",
+    "name": "8",
     "polygon": [
       [
         -122.35988209451382,
@@ -304,7 +304,7 @@
     ]
   },
   {
-    "name": "Zone 11 Hillsboro, Aloha, Beaverton",
+    "name": "11",
     "polygon": [
       [
         -122.78482101457293,
@@ -341,7 +341,7 @@
     ]
   },
   {
-    "name": "Zone 10 - Tigard, Tualatin, Sherwood, Newberg",
+    "name": "10",
     "polygon": [
       [
         -122.85956930653514,
@@ -374,7 +374,7 @@
     ]
   },
   {
-    "name": "Zone 9 - Clackamas, Gladstone, Oregon City, West Linn",
+    "name": "9",
     "polygon": [
       [
         -122.76536597967866,
@@ -419,7 +419,7 @@
     ]
   },
   {
-    "name": "Zone 7",
+    "name": "7",
     "polygon": [
       [
         -122.35988209451382,
@@ -452,7 +452,7 @@
     ]
   },
   {
-    "name": "Zone 3\u00a0",
+    "name": "3",
     "polygon": [
       [
         -122.76331808126874,
