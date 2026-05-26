@@ -11,6 +11,14 @@ credentials/
 __pycache__/
 *.pyc
 
+.env
+
 # IDE
 .idea/
 .vscode/
+
+# Virtual environment
+venv/
+
+# Runtime cache (regenerated from the geocoding API)
+geocode_cache.json

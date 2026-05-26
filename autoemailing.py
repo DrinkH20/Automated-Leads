@@ -274,8 +274,8 @@ def run_automation():
                     continue
 
 
-                name, service_type, email, sqft, bed, bath, zone, phone, utm = lead
-                lead = (name, service_type, email, sqft, bed, bath, zone, phone, utm, market)
+                name, service_type, email, sqft, bed, bath, zone, phone, campaign, source = lead
+                lead = (name, service_type, email, sqft, bed, bath, zone, phone, campaign, source, market)
 
                 # ---- Validation ----
                 # if not zone:
@@ -489,9 +489,13 @@ def parse_email_details(text, mark):
     # ------------------------
     # Name + Service
     # ------------------------
+    # Handles both the old "Last, First wants <type> cleaning" form (comma) and
+    # the new "First Last wants <type> cleaning" form (no comma). Name chars are
+    # restricted to a single line so it can't bleed into earlier lines.
     name_type_match = re.search(
-        r'\s*([\w\s]+,\s*[\w\s()]+)\s+wants\s+([\w\s]+)\s+cleaning',
-        cleaned
+        r"([A-Za-z][\w \t,.'()-]*?)\s+wants\s+([\w \t-]+?)\s+cleaning",
+        cleaned,
+        re.IGNORECASE
     )
 
     if name_type_match:
@@ -516,13 +520,14 @@ def parse_email_details(text, mark):
     # ------------------------
     # SQFT / Beds / Baths
     # ------------------------
-    sqft_match = re.search(r'SQFT:\s*(\d+)', cleaned)
+    # Colon is optional: the new form renders e.g. "Bath 5" without a colon.
+    sqft_match = re.search(r'SQFT\s*:?\s*(\d+)', cleaned, re.IGNORECASE)
     sqft = sqft_match.group(1) if sqft_match else None
 
-    bed_match = re.search(r'Bed:\s*(\d+)', cleaned)
+    bed_match = re.search(r'Bed\s*:?\s*(\d+)', cleaned, re.IGNORECASE)
     bed = bed_match.group(1) if bed_match else None
 
-    bath_match = re.search(r'Bath:\s*([\d\.]+)', cleaned)
+    bath_match = re.search(r'Bath\s*:?\s*([\d\.]+)', cleaned, re.IGNORECASE)
     bath = bath_match.group(1) if bath_match else None
 
     # ------------------------
@@ -553,27 +558,31 @@ def parse_email_details(text, mark):
     # Final safety check
     if not address:
         print("WARNING: No valid address found.")
-        return name, service_type, email, sqft, bed, bath, None, phone, None
+        return name, service_type, email, sqft, bed, bath, None, phone, None, None
 
     # ------------------------
     # UTM Extraction
     # ------------------------
-    utm_order = [
-        'UTM4contentAdID:',
-        'UTMreferrerURL:',
-        'UTM1source:',
-        'UTM2CampaignID:',
-        'UTM3AdSetID:'
-    ]
+    # Pull the campaign code and the source code separately. The new "NEW LEAD"
+    # form lists them as "CAMPAIGN :" and "SOURCE :". Keys are matched only at
+    # the start of a line so e.g. CAMPAIGN can't match inside "UTM2CampaignID";
+    # colon and surrounding spaces are optional. Legacy UTM keys are kept as a
+    # fallback so any straggler old-form emails still populate something.
+    def find_utm(*keys):
+        for key in keys:
+            match = re.search(
+                rf'^[ \t]*{re.escape(key)}[ \t]*:?[ \t]*([^\s:][^\r\n<]*)',
+                cleaned,
+                re.IGNORECASE | re.MULTILINE
+            )
+            if match:
+                value = match.group(1).strip()
+                if value:
+                    return value
+        return None
 
-    utm_value = None
-    for utm in utm_order:
-        match = re.search(rf'{utm}\s*([^\r\n<]+)', cleaned)
-        if match:
-            value = match.group(1).strip()
-            if value:
-                utm_value = value
-                break
+    campaign_value = find_utm('CAMPAIGN', 'UTM2CampaignID', 'UTM4contentAdID')
+    source_value = find_utm('SOURCE', 'UTM1source', 'UTMreferrerURL')
 
 
     # Get zone safely
@@ -583,7 +592,7 @@ def parse_email_details(text, mark):
         print(zone)
         return
 
-    return name, service_type, email, sqft, bed, bath, zone, phone, utm_value
+    return name, service_type, email, sqft, bed, bath, zone, phone, campaign_value, source_value
 
 
 def get_cleaned_body(body):

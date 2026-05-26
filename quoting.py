@@ -1,18 +1,12 @@
-import os
-import xlwings as xw
-
 import shutil
 import os
-# from win32com.client import gencache
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials
-import time
-from decimal import Decimal
+
 from gspread.exceptions import APIError
 import time
 
 
-genpy_dir = os.path.join(os.environ['LOCALAPPDATA'], 'Temp', 'gen_py')
+import tempfile
+genpy_dir = os.path.join(tempfile.gettempdir(), 'gen_py')
 shutil.rmtree(genpy_dir, ignore_errors=True)
 # gencache.is_readonly = False
 # gencache.Rebuild()

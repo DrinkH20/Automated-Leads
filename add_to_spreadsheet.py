@@ -18,6 +18,7 @@ import re
 from server_price_connect import update_servers
 import unicodedata
 from quoting import batch_get_quotes
+from script_loader import get_email_script, get_title
 
 # ot, initial, move, monthly, biweekly, weekly = 0,0,0,0,0,0
 
@@ -132,6 +133,7 @@ def normalize_service_type(raw):
 def revise_list(data, mark, dfw_count, pdx_pricing, dfw_pricing):
 
     revised_data, draft_list = [], []
+    markets_for_rows = []  # ✅ add this
     today_date = datetime.now().strftime('%#m/%#d')
     scripts_choose = ["ONETIME", "MOVE", "WEEKLY", "BIWEEKLY", "MONTHLY"]
 
@@ -141,6 +143,7 @@ def revise_list(data, mark, dfw_count, pdx_pricing, dfw_pricing):
     quotes_to_run_phx = []
     for item in data:
         # Unpack what you *know*; guard lengths
+        market = item[10] if len(item) > 10 else "PDX"
         name         = item[0] if len(item) > 0 else None
         service_type = item[1] if len(item) > 1 else None
         email        = item[2] if len(item) > 2 else None
@@ -149,7 +152,8 @@ def revise_list(data, mark, dfw_count, pdx_pricing, dfw_pricing):
         bath         = item[5] if len(item) > 5 else None
         state_place  = item[6] if len(item) > 6 else None
         phone        = item[7] if len(item) > 7 else None
-        utm_value    = item[8] if len(item) > 8 and item[8] is not None else ""
+        campaign_value = item[8] if len(item) > 8 and item[8] is not None else ""
+        source_value   = item[9] if len(item) > 9 and item[9] is not None else ""
 
         # --- NEW: if name or service_type missing, scan all string fields in *this* item only
         if not name or not service_type:
@@ -184,29 +188,48 @@ def revise_list(data, mark, dfw_count, pdx_pricing, dfw_pricing):
         except ValueError:
             stype_idx = 0
 
+        markets_for_rows.append(market)  # ✅ add this
         # Add to sheet data
         revised_data.append((
-            today_date, utm_value, "Auto", "", "emailed",
+            today_date, source_value, "Auto", "", "emailed",  # B = source code
             "", "", "", "", "",
             name, service_type, zone, email, phone, "",
-            utm_value, city
+            campaign_value, city  # Q = campaign code
         ))
 
         # Compose draft using market split
-        if (len(data) - count) > dfw_count:
-            quotes_to_run_dfw.append(((sqft, bed, bath), stype_idx, first_name, last_name,
-                                      "Joel", city, "PDX"))
-            count += 1
-            # sub, body_text = autocalc(sqft, bed, bath, stype_idx, first_name, last_name,
-            #                           "Joel", city, "PDX", factor_dfw, pdx_pricing)
-        else:
-            quotes_to_run_pdx.append(((sqft, bed, bath), stype_idx, first_name, last_name,
-                                 "Joel", city, "DFW"))
+        # if (len(data) - count) > dfw_count:
+        #     quotes_to_run_dfw.append(((sqft, bed, bath), stype_idx, first_name, last_name,
+        #                               "Joel", city, "PDX"))
+        #     count += 1
+        #     # sub, body_text = autocalc(sqft, bed, bath, stype_idx, first_name, last_name,
+        #     #                           "Joel", city, "PDX", factor_dfw, pdx_pricing)
+        # else:
+        #     quotes_to_run_pdx.append(((sqft, bed, bath), stype_idx, first_name, last_name,
+        #                          "Joel", city, "DFW"))
+        quote_tuple = (
+            (sqft, bed, bath),
+            stype_idx,
+            first_name,
+            last_name,
+            "Joel",
+            city,
+            market,
+            email  # ← carry email with quote
+        )
+
+        if market == "PDX":
+            quotes_to_run_pdx.append(quote_tuple)
+        elif market == "DFW":
+            quotes_to_run_dfw.append(quote_tuple)
+        elif market == "PHX":
+            quotes_to_run_phx.append(quote_tuple)
+
             count += 1
 
     quotes_to_run = [
         batch
-        for batch in (quotes_to_run_dfw, quotes_to_run_pdx)
+        for batch in (quotes_to_run_dfw, quotes_to_run_pdx, quotes_to_run_phx)
         if batch and len(batch) > 0
     ]
 
@@ -240,7 +263,7 @@ def revise_list(data, mark, dfw_count, pdx_pricing, dfw_pricing):
 
     final_outputs = []
 
-    count = 0
+    # count = 0
     for market_index, market_batch in enumerate(quotes_to_run):
 
         market_results = all_results_quotes[market_index]
@@ -263,11 +286,12 @@ def revise_list(data, mark, dfw_count, pdx_pricing, dfw_pricing):
             last_name = quote[3]
             username = quote[4]
             city = quote[5]
-            market = quote[6]  # keep original casing if you want
+            market = quote[6]
+            email = quote[7]  # ← now safe
 
-            email = revised_data[count]
-            email = email[13]
-            count += 1
+            # email = revised_data[count]
+            # email = email[13]
+            # count += 1
 
             # Pricing output for this quote
             pricing = result["output"]  # list of Decimals
@@ -319,7 +343,7 @@ def revise_list(data, mark, dfw_count, pdx_pricing, dfw_pricing):
     #
     # return revised_data
     # Don't send drafts here. Just return them.
-    return revised_data, draft_list
+    return revised_data, draft_list, markets_for_rows
 
 
 def create_label_if_not_exists(service, user_id, label_name, markt=None):
@@ -381,13 +405,17 @@ def create_draft(service, sender_name, sender, subject, message_text, receiver, 
         message = MIMEMultipart('alternative')
         formatted_sender = formataddr((sender_name, sender))
 
-        if area.upper() != "DFW":
+        if area.upper() == "PDX":
             footer_html = """
             <table width="206" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;border-spacing:0px;color:rgb(20,49,65);font-family:proxima-nova,sans-serif;font-size:16px"><tbody><tr><td style="margin:auto;padding:0px 0px 1px"><a href="https://cleanaffinity.com/" style="background-color:transparent;color:rgb(35,82,124);outline:0px;display:inline-block" target="_blank" data-saferedirecturl="https://www.google.com/url?q=https://cleanaffinity.com/&amp;source=gmail&amp;ust=1753387360204000&amp;usg=AOvVaw1_qGxFX9vNvZj88nCJmRhf"><img width="200" src="https://ci3.googleusercontent.com/meips/ADKq_NaHCjqRyVIbvhTlEb3vGPvT6jjSyDbNyBJE7ZhgTdaYGWQ2Ux1vTrGvxNSFWCoI_7YLbi2lyvNToByk2wku5X4Ty3j2kGBnqDThP-lz5meLf3ComXVwEg=s0-d-e1-ft#https://s1g.s3.amazonaws.com/325e6b8720f2f9a00d074326edf01a9f.png" style="border:none;vertical-align:baseline" class="CToWUd" data-bit="iit"></a></td></tr><tr><td height="4" style="padding:0px;border-top:3px solid rgb(0,0,0)"></td></tr><tr><td style="padding:0px;vertical-align:middle;color:rgb(0,0,0);font-size:12px;font-family:helvetica,arial"><span style="font-weight:700"><span style="font-size:15px">Office Team</span></span><br><br><table cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;border-spacing:0px;background-color:transparent;margin:0px 1px 1px 0px"><tbody><tr><td style="padding:0px 1px 0px 0px"><img width="33" height="33" src="https://ci3.googleusercontent.com/meips/ADKq_Nbu8BcqvPO0NsMt0thKm1fy5BM-bke3tekFIPLPj8-lOIllqWmOXD_sNYvqyTuFPb8NZLkVMMT1KtHKvYpfxBq-1Rs_P3kVVbF3j3_umEaigthjxIeBBg=s0-d-e1-ft#https://s1g.s3.amazonaws.com/3e17acc3e1f17ca0eb066f92112030d4.png" alt="email" style="border:none;vertical-align:baseline" class="CToWUd" data-bit="iit"></td><td style="padding:0px"><span style="font-size-adjust:none;font-stretch:normal;line-height:normal"><a href="mailto:hello@cleanaffinity.com" style="background-color:transparent;color:rgb(0,0,0)" target="_blank">hello@cleanaffinity.com</a></span></td></tr></tbody></table><table cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;border-spacing:0px;background-color:transparent;margin:0px 1px 1px 0px"><tbody><tr><td style="padding:0px 1px 0px 0px"><img width="33" height="33" src="https://ci3.googleusercontent.com/meips/ADKq_NbOvxEt5lgrvY7In4555tR498ZHVnamfeiNDuz0ihljVAOsV1JEkU7A8huN48KtfFD-RaiqMdvdbpefi2ElxhXdGOXBcb5OIoj2c5IudggNYU8JcBIWxA=s0-d-e1-ft#https://s1g.s3.amazonaws.com/6d17a9904ea926bfe5700c3e877f70c0.png" alt="mobile" style="border:none;vertical-align:baseline" class="CToWUd" data-bit="iit"></td><td style="padding:0px"><span style="font-size-adjust:none;font-stretch:normal;line-height:normal"><a href="tel:503-933-1917" target="_blank">503-933-1917</a></span></td></tr></tbody></table><table cellpadding="0" border="0" style="border-collapse:collapse;border-spacing:0px;background-color:transparent"><tbody><tr><td style="padding:0px 5px 0px 0px"><a href="https://facebook.com/cleanaffinity/" style="background-color:transparent;color:rgb(51,122,183);display:inline-block" target="_blank" data-saferedirecturl="https://www.google.com/url?q=https://facebook.com/cleanaffinity/&amp;source=gmail&amp;ust=1753387360204000&amp;usg=AOvVaw1PokiaSIca2gSp9_r74Pu2"><img width="33" height="33" src="https://ci3.googleusercontent.com/meips/ADKq_NarBJHUDBNpZSF5x9fwZRDVzxrCJQ0OjwhhH5kt5Prfkk-Ae1pCwBmyRD2fyPtAklyAZDBnTH8kUNq8b1zU9cy_YXAjjV7JVzc_0XoliAgiyxNqz8x5gw=s0-d-e1-ft#https://s1g.s3.amazonaws.com/2c5fe92c2cad30bc7beafa503141662b.png" alt="Facebook" style="border:none;vertical-align:baseline" class="CToWUd" data-bit="iit"></a></td><td style="padding:0px 5px 0px 0px"><a href="https://instagram.com/cleanaffinity/" style="background-color:transparent;color:rgb(51,122,183);display:inline-block" target="_blank" data-saferedirecturl="https://www.google.com/url?q=https://instagram.com/cleanaffinity/&amp;source=gmail&amp;ust=1753387360204000&amp;usg=AOvVaw16I4Z5Yx74Y6W15ySxm9yJ"><img width="33" height="33" src="https://ci3.googleusercontent.com/meips/ADKq_NZxAdIU3eRhJqF8PfQpL0gZAj4ovvZCNNIY4aDVSWm4yfk_nW9A5s6Dt3oi9y4mthvIgZViU5HaXEcUUK6Vx8sClYSC_nYEEwuRmnXan-ZJzjuWbkKNkw=s0-d-e1-ft#https://s1g.s3.amazonaws.com/85231364dae3871f3e2465f0e3e47239.png" alt="Instagram" style="border:none;vertical-align:baseline" class="CToWUd" data-bit="iit"></a></td></tr></tbody></table><a href="https://cleanaffinity.com/" style="background-color:transparent;color:rgb(0,0,0)" target="_blank" data-saferedirecturl="https://www.google.com/url?q=https://cleanaffinity.com/&amp;source=gmail&amp;ust=1753387360204000&amp;usg=AOvVaw1_qGxFX9vNvZj88nCJmRhf">cleanaffinity.com/</a><br></td></tr></tbody></table>
             """
-        else:
+        elif area.upper() == "DFW":
             footer_html = """
             <table width="206" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;border-spacing:0px;color:rgb(20,49,65);font-family:proxima-nova,sans-serif;font-size:16px"><tbody><tr><td style="margin:auto;padding:0px 0px 1px"><a href="https://cleanaffinity.com/" style="background-color:transparent;color:rgb(35,82,124);outline:0px;display:inline-block" target="_blank" data-saferedirecturl="https://www.google.com/url?q=https://cleanaffinity.com/&amp;source=gmail&amp;ust=1753390838452000&amp;usg=AOvVaw1Jdh4ThRFl97qfd7jNlOSq"><img width="200" src="https://ci3.googleusercontent.com/meips/ADKq_NaHCjqRyVIbvhTlEb3vGPvT6jjSyDbNyBJE7ZhgTdaYGWQ2Ux1vTrGvxNSFWCoI_7YLbi2lyvNToByk2wku5X4Ty3j2kGBnqDThP-lz5meLf3ComXVwEg=s0-d-e1-ft#https://s1g.s3.amazonaws.com/325e6b8720f2f9a00d074326edf01a9f.png" style="border:none;vertical-align:baseline" class="CToWUd" data-bit="iit"></a></td></tr><tr><td height="4" style="padding:0px;border-top:3px solid rgb(0,0,0)"></td></tr><tr><td style="padding:0px;vertical-align:middle;color:rgb(0,0,0);font-size:12px;font-family:helvetica,arial"><span style="font-weight:700"><span style="font-size:15px">Office Team</span></span><br><br><table cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;border-spacing:0px;background-color:transparent;margin:0px 1px 1px 0px"><tbody><tr><td style="padding:0px 1px 0px 0px"><img width="33" height="33" src="https://ci3.googleusercontent.com/meips/ADKq_Nbu8BcqvPO0NsMt0thKm1fy5BM-bke3tekFIPLPj8-lOIllqWmOXD_sNYvqyTuFPb8NZLkVMMT1KtHKvYpfxBq-1Rs_P3kVVbF3j3_umEaigthjxIeBBg=s0-d-e1-ft#https://s1g.s3.amazonaws.com/3e17acc3e1f17ca0eb066f92112030d4.png" alt="email" style="border:none;vertical-align:baseline" class="CToWUd" data-bit="iit"></td><td style="padding:0px"><span style="font-size-adjust:none;font-stretch:normal;line-height:normal"><a href="mailto:hellodfw@cleanaffinity.com" style="background-color:transparent;color:rgb(0,0,0)" target="_blank">hellodfw@cleanaffinity.com</a></span></td></tr></tbody></table><table cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;border-spacing:0px;background-color:transparent;margin:0px 1px 1px 0px"><tbody><tr><td style="padding:0px 1px 0px 0px"><img width="33" height="33" src="https://ci3.googleusercontent.com/meips/ADKq_NbOvxEt5lgrvY7In4555tR498ZHVnamfeiNDuz0ihljVAOsV1JEkU7A8huN48KtfFD-RaiqMdvdbpefi2ElxhXdGOXBcb5OIoj2c5IudggNYU8JcBIWxA=s0-d-e1-ft#https://s1g.s3.amazonaws.com/6d17a9904ea926bfe5700c3e877f70c0.png" alt="mobile" style="border:none;vertical-align:baseline" class="CToWUd" data-bit="iit"></td><td style="padding:0px"><span style="font-size-adjust:none;font-stretch:normal;line-height:normal"><a href="tel:972-318-4678" target="_blank">972-318-4678</a></span></td></tr></tbody></table><table cellpadding="0" border="0" style="border-collapse:collapse;border-spacing:0px;background-color:transparent"><tbody><tr><td style="padding:0px 5px 0px 0px"><a href="https://facebook.com/cleanaffinity/" style="background-color:transparent;color:rgb(51,122,183);display:inline-block" target="_blank" data-saferedirecturl="https://www.google.com/url?q=https://facebook.com/cleanaffinity/&amp;source=gmail&amp;ust=1753390838453000&amp;usg=AOvVaw3nrk9R9LBXsHPIEY36yHhu"><img width="33" height="33" src="https://ci3.googleusercontent.com/meips/ADKq_NarBJHUDBNpZSF5x9fwZRDVzxrCJQ0OjwhhH5kt5Prfkk-Ae1pCwBmyRD2fyPtAklyAZDBnTH8kUNq8b1zU9cy_YXAjjV7JVzc_0XoliAgiyxNqz8x5gw=s0-d-e1-ft#https://s1g.s3.amazonaws.com/2c5fe92c2cad30bc7beafa503141662b.png" alt="Facebook" style="border:none;vertical-align:baseline" class="CToWUd" data-bit="iit"></a></td><td style="padding:0px 5px 0px 0px"><a href="https://instagram.com/cleanaffinity/" style="background-color:transparent;color:rgb(51,122,183);display:inline-block" target="_blank" data-saferedirecturl="https://www.google.com/url?q=https://instagram.com/cleanaffinity/&amp;source=gmail&amp;ust=1753390838453000&amp;usg=AOvVaw0S9ak4Y_nKy5X1r4alhRtS"><img width="33" height="33" src="https://ci3.googleusercontent.com/meips/ADKq_NZxAdIU3eRhJqF8PfQpL0gZAj4ovvZCNNIY4aDVSWm4yfk_nW9A5s6Dt3oi9y4mthvIgZViU5HaXEcUUK6Vx8sClYSC_nYEEwuRmnXan-ZJzjuWbkKNkw=s0-d-e1-ft#https://s1g.s3.amazonaws.com/85231364dae3871f3e2465f0e3e47239.png" alt="Instagram" style="border:none;vertical-align:baseline" class="CToWUd" data-bit="iit"></a></td></tr></tbody></table><a href="https://cleanaffinity.com/home-cleaning-services-dallas/" style="background-color:transparent;color:rgb(0,0,0)" target="_blank" data-saferedirecturl="https://www.google.com/url?q=https://cleanaffinity.com/home-cleaning-services-dallas/&amp;source=gmail&amp;ust=1753390838453000&amp;usg=AOvVaw2n1bKaSwZdhhL_nJ_5XRq2">cleanaffinity.com/</a><br></td></tr></tbody></table>
+            """
+        elif area.upper() == "PHX":
+            footer_html = """
+            <table width="206" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;border-spacing:0px;color:rgb(20,49,65);font-family:proxima-nova,sans-serif;font-size:16px"><tbody><tr><td style="margin:auto;padding:0px 0px 1px"><a href="https://cleanaffinity.com/" style="background-color:transparent;color:rgb(35,82,124);outline:0px;display:inline-block" target="_blank"><img width="200" src="https://s1g.s3.amazonaws.com/325e6b8720f2f9a00d074326edf01a9f.png" style="border:none;vertical-align:baseline"></a></td></tr><tr><td height="4" style="padding:0px;border-top:3px solid rgb(0,0,0)"></td></tr><tr><td style="padding:0px;vertical-align:middle;color:rgb(0,0,0);font-size:12px;font-family:helvetica,arial"><span style="font-weight:700"><span style="font-size:15px">Office Team</span></span><br><br><table cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;border-spacing:0px;background-color:transparent;margin:0px 1px 1px 0px"><tbody><tr><td style="padding:0px 1px 0px 0px"><img width="33" height="33" src="https://s1g.s3.amazonaws.com/3e17acc3e1f17ca0eb066f92112030d4.png" alt="email" style="border:none;vertical-align:baseline"></td><td style="padding:0px"><span style="font-size-adjust:none;font-stretch:normal;line-height:normal"><a href="mailto:hellophx@cleanaffinity.com" style="background-color:transparent;color:rgb(0,0,0)" target="_blank">hellophx@cleanaffinity.com</a></span></td></tr></tbody></table><table cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;border-spacing:0px;background-color:transparent;margin:0px 1px 1px 0px"><tbody><tr><td style="padding:0px 1px 0px 0px"><img width="33" height="33" src="https://s1g.s3.amazonaws.com/6d17a9904ea926bfe5700c3e877f70c0.png" alt="mobile" style="border:none;vertical-align:baseline"></td><td style="padding:0px"><span style="font-size-adjust:none;font-stretch:normal;line-height:normal"><a href="tel:480-428-8450" target="_blank">480-428-8450</a></span></td></tr></tbody></table><table cellpadding="0" border="0" style="border-collapse:collapse;border-spacing:0px;background-color:transparent"><tbody><tr><td style="padding:0px 5px 0px 0px"><a href="https://facebook.com/cleanaffinity/" style="background-color:transparent;color:rgb(51,122,183);display:inline-block" target="_blank"><img width="33" height="33" src="https://s1g.s3.amazonaws.com/2c5fe92c2cad30bc7beafa503141662b.png" alt="Facebook" style="border:none;vertical-align:baseline"></a></td><td style="padding:0px 5px 0px 0px"><a href="https://instagram.com/cleanaffinity/" style="background-color:transparent;color:rgb(51,122,183);display:inline-block" target="_blank"><img width="33" height="33" src="https://s1g.s3.amazonaws.com/85231364dae3871f3e2465f0e3e47239.png" alt="Instagram" style="border:none;vertical-align:baseline"></a></td></tr></tbody></table><a href="https://cleanaffinity.com/home-cleaning-services-dallas/" style="background-color:transparent;color:rgb(0,0,0)" target="_blank">cleanaffinity.com/</a><br></td></tr></tbody></table>
             """
 
         html_message = convert_text_to_html(message_text) + footer_html
@@ -397,19 +425,38 @@ def create_draft(service, sender_name, sender, subject, message_text, receiver, 
         message.attach(MIMEText(html_message, 'html'))
 
         message['to'] = receiver
+        # if area.upper() == "PDX":
+        #     message['from'] = formataddr(("Clean Affinity", "hello@cleanaffinity.com"))
+        # else:
+        #     message['from'] = formataddr(("Clean Affinity", "hellodfw@cleanaffinity.com"))
+        message['subject'] = subject
+
         if area.upper() == "PDX":
-            message['from'] = formataddr(("Clean Affinity", "hello@cleanaffinity.com"))
-        else:
-            message['from'] = formataddr(("Clean Affinity", "hellodfw@cleanaffinity.com"))
+            sender_email = formataddr(("Clean Affinity", "hello@cleanaffinity.com"))
+        elif area.upper() == "DFW":
+            sender_email = formataddr(("Clean Affinity", "hellodfw@cleanaffinity.com"))
+        elif area.upper() == "PHX":
+            sender_email = formataddr(("Clean Affinity", "hellophx@cleanaffinity.com"))
+
+        message['from'] = sender_email
 
         message['subject'] = subject
 
         raw = base64.urlsafe_b64encode(message.as_bytes()).decode()
+        # draft_body = {'message': {'raw': raw}}
+        # draft = service.users().drafts().create(userId='me', body=draft_body).execute()
+        # logging.debug(f"Draft created with ID: {draft['id']}")
+        #
+        # message_id = draft['message']['id']
+        # send_body = {'raw': raw}
+        # sent_message = service.users().messages().send(userId='me', body=send_body).execute()
+        # logging.debug(f"Email sent with ID: {sent_message['id']}")
         draft_body = {'message': {'raw': raw}}
         draft = service.users().drafts().create(userId='me', body=draft_body).execute()
-        logging.debug(f"Draft created with ID: {draft['id']}")
+        logging.info("Draft created")
+        return draft
 
-        message_id = draft['message']['id']
+        message_id = sent_message['id']
 
         # Ensure both labels exist
         label_ids = []
@@ -422,13 +469,18 @@ def create_draft(service, sender_name, sender, subject, message_text, receiver, 
             if dfw_id:
                 label_ids.append(dfw_id)
 
+        if area.upper() == "PHX":
+            phx_id = create_label_if_not_exists(service, 'me', "PHX", area)
+            if phx_id:
+                label_ids.append(phx_id)
+
         # Apply labels
         if label_ids:
             apply_label_to_message(service, 'me', message_id, label_ids[0])
             for label_id in label_ids[1:]:
                 apply_label_to_message(service, 'me', message_id, label_id)
 
-        return draft
+        return sent_message
 
     except Exception as e:
         logging.error(f"An error occurred while creating a draft: {e}")
@@ -506,34 +558,45 @@ def add_to_spreadsheet(raw_data, mrkt, dfw_amount, pdx_prices, dfw_prices):
     sheet_name = 'Sheet1'
 
     # data = revise_list(raw_data, mrkt, dfw_amount, pdx_prices, dfw_prices)
-    data, draft_list = revise_list(raw_data, mrkt, dfw_amount, pdx_prices, dfw_prices)
+    # data, draft_list = revise_list(raw_data, mrkt, dfw_amount, pdx_prices, dfw_prices)
+    data, draft_list, markets_for_rows = revise_list(raw_data, mrkt, dfw_amount, pdx_prices, dfw_prices)
 
     try:
-        sheet = client.open_by_key(spreadsheet_id).worksheet(sheet_name)
-        print(f"Successfully accessed the spreadsheet '{sheet_name}'.")
+        # Group rows by market tab name (PDX / DFW / PHX)
+        rows_by_market = {"PDX": [], "DFW": [], "PHX": []}
 
-        # 🔥 Filter valid rows first
-        rows_to_insert = [item for item in data if len(item) == 18]
+        for row, mkt in zip(data, markets_for_rows):
+            mkt = (mkt or "PDX").upper()
+            if mkt not in rows_by_market:
+                mkt = "PDX"
+            if len(row) == 18:
+                rows_by_market[mkt].append(row)
 
-        if not rows_to_insert:
-            print("No valid rows to insert.")
-            return
+        gsheet = client.open_by_key(spreadsheet_id)
 
-        # 🔥 Find next available row ONCE (1 read call)
-        existing_rows = sheet.col_values(1)
-        start_row = len(existing_rows) + 1
-        end_row = start_row + len(rows_to_insert) - 1
+        for mkt, rows_to_insert in rows_by_market.items():
+            if not rows_to_insert:
+                continue
 
-        update_range = f"A{start_row}:R{end_row}"
+            try:
+                sheet = gsheet.worksheet(mkt)  # ✅ tab name matches market
+            except Exception as e:
+                print(f"ERROR: Could not find worksheet tab '{mkt}'. Create a tab named '{mkt}' in the sheet.")
+                raise
 
-        print(f"Inserting {len(rows_to_insert)} rows at once "
-              f"(Rows {start_row}–{end_row})")
+            # Next available row ONCE per tab
+            existing_rows = sheet.col_values(1)
+            start_row = len(existing_rows) + 1
+            end_row = start_row + len(rows_to_insert) - 1
 
-        # 🔥 ONE WRITE CALL
-        sheet.update(update_range, rows_to_insert, value_input_option="RAW")
+            update_range = f"A{start_row}:R{end_row}"
+            print(f"[{mkt}] Inserting {len(rows_to_insert)} rows at once (Rows {start_row}–{end_row})")
 
-        print("Data appended successfully.")
+            # Use keyword args: gspread 6.x flipped the positional order of
+            # (range_name, values) to (values, range_name). Keywords work on both.
+            sheet.update(values=rows_to_insert, range_name=update_range, value_input_option="RAW")
 
+        print("✅ Data appended successfully by market.")
     except gspread.exceptions.SpreadsheetNotFound:
         print(f"Spreadsheet with ID '{spreadsheet_id}' not found.")
     except Exception as e:
@@ -541,23 +604,18 @@ def add_to_spreadsheet(raw_data, mrkt, dfw_amount, pdx_prices, dfw_prices):
     return draft_list
 
 
-
 today = date.today()
 months_list = ("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December")
 month = months_list[today.month-1]
 
-
-# def update_prices(mark, ot, initial, move, monthly, biweekly, weekly):
-#     factors, texas_factors = update_servers(mark)
-#     set_ot, set_initial, set_move, set_monthly, set_biweekly, set_weekly = map(float, factors)
-#     # print(texas_factors)
-#     if (ot, initial, move, monthly, biweekly, weekly) == (set_ot, set_initial, set_move, set_monthly, set_biweekly,
-#                                                           set_weekly):
-#         print("No change needed")
-#     else:
-#         ot, initial, move, monthly, biweekly, weekly = set_ot, set_initial, set_move, set_monthly, set_biweekly, set_weekly
-#         print("Prices successfully updated!")
-#     return texas_factors, ot, initial, move, monthly, biweekly, weekly
+def clean_number(value):
+    """
+    Returns int if float is whole number.
+    Otherwise returns original float.
+    """
+    if isinstance(value, float) and value.is_integer():
+        return int(value)
+    return value
 
 
 def autocalc(sqft, beds, baths, type_clean_numerical, name_first, name_last, username, city, market, pricing):
@@ -574,279 +632,33 @@ def autocalc(sqft, beds, baths, type_clean_numerical, name_first, name_last, use
     else:
         elite = pricing[type_clean_price]
 
-    title = get_title(sqft, beds, baths, type_clean_numerical, name_last, name_first)
-    if market == "DFW":
-        main_info = get_quote_dfw(month, round(elite), round(ongoing), type_clean_numerical, name_first, username, city)
-    else:
-        main_info = get_quote(month, round(elite), round(ongoing), type_clean_numerical, name_first, username, city)
-
-    return title, main_info
-
-
-# This is all the different scripts
-def get_title(sqft, beds, baths, part_list, last, first):
-    sqft = int(sqft)
-    sqft = round(sqft/10)*10
-    beds = int(beds)
-
-    if baths == int(baths):
-        baths = int(baths)
-
-    if beds <= 1 >= baths:
-        scripts = [f"{last}, {first} - One Time Clean {sqft} sqft, {beds} Bed, {baths} Bath",
-                   f"{last}, {first} - Move Clean {sqft} sqft, {beds} Bed, {baths} Bath",
-                   f"{last}, {first} - Weekly Cleans {sqft} sqft, {beds} Bed, {baths} Bath",
-                   f"{last}, {first} - Biweekly Cleans {sqft} sqft, {beds} Bed, {baths} Bath",
-                   f"{last}, {first} - Monthly Cleans {sqft} sqft, {beds} Bed, {baths} Bath"]
-    elif beds > 1 < baths:
-        scripts = [f"{last}, {first} - One Time Clean {sqft} sqft, {beds} Beds, {baths} Baths",
-                   f"{last}, {first} - Move Clean {sqft} sqft, {beds} Beds, {baths} Baths",
-                   f"{last}, {first} - Weekly Cleans {sqft} sqft, {beds} Beds, {baths} Baths",
-                   f"{last}, {first} - Biweekly Cleans {sqft} sqft, {beds} Beds, {baths} Baths",
-                   f"{last}, {first} - Monthly Cleans {sqft} sqft, {beds} Beds, {baths} Baths"]
-    elif beds > 1 >= baths:
-        scripts = [f"{last}, {first} - One Time Clean {sqft} sqft, {beds} Beds, {baths} Bath",
-                   f"{last}, {first} - Move Clean {sqft} sqft, {beds} Beds, {baths} Bath",
-                   f"{last}, {first} - Weekly Cleans {sqft} sqft, {beds} Beds, {baths} Bath",
-                   f"{last}, {first} - Biweekly Cleans {sqft} sqft, {beds} Beds, {baths} Bath",
-                   f"{last}, {first} - Monthly Cleans {sqft} sqft, {beds} Beds, {baths} Bath"]
-    else:
-        scripts = [f"{last}, {first} - One Time Clean {sqft} sqft, {beds} Bed, {baths} Baths",
-                   f"{last}, {first} - Move Clean {sqft} sqft, {beds} Bed, {baths} Baths",
-                   f"{last}, {first} - Weekly Cleans {sqft} sqft, {beds} Bed, {baths} Baths",
-                   f"{last}, {first} - Biweekly Cleans {sqft} sqft, {beds} Bed, {baths} Baths",
-                   f"{last}, {first} - Monthly Cleans {sqft} sqft, {beds} Bed, {baths} Baths"]
-
-    return scripts[part_list]
-
-
-def get_quote(date_month, initial, recuring, part_list, name="there", username="", city=""):
-    scripts = [f"""Hi {name},
-
-We’re excited to help make your home feel fresh and spotless!
-
-Based on the info you provided and our {date_month} special, your one-time clean will be ${initial} (Includes washing all interior window panes within arms reach!)
-•	        Would you like any extras like fridge, oven, window blind or track cleaning?
-•	        Are there any other cleaning needs/notes you would like for me to add to our list?
-Please let me know if you would like to get on the schedule and if you have any preferred days/times. Our schedule fills up quickly, but we still have a few spots open in {date_month}!
-
-We look forward to cleaning for you!
-{username}""", f"""Hi {name},
-
-We’re excited to help make your home feel fresh and spotless!
-
-Based on the info you provided and our {date_month} special, your moving clean will be ${initial} (Includes washing all interior window panes within arms reach!)
-•	        Would you like any extras like fridge, oven, window blind or track cleaning?
-•	        Are there any other cleaning needs/notes you would like for me to add to our list?
-Please let me know if you would like to get on the schedule and if you have any preferred days/times. Our schedule fills up quickly, but we still have a few spots open in {date_month}!
-
-We look forward to cleaning for you!
-{username}""", f"""Hi {name}!
-
-We’re excited to help make your home feel fresh and spotless!
-
-Normally, your initial reset clean would be ${initial*2},
-but with our {date_month} special, it’s 50% off — just ${initial}. Your weekly service is ${recuring}, with the whole home cleaned every visit.
-
-Let me know if you’d like to get on the schedule and if you have any preferred days or times. Our calendar fills up quickly (especially for the longer initial clean), but we still have a few {date_month} spots available. What works best for you?
-
-We look forward to cleaning for you!
-{username}
-""", f"""Hi {name}!
-
-We’re excited to help make your home feel fresh and spotless!
-
-Normally, your initial reset clean would be ${initial*2},
-but with our {date_month} special, it’s 50% off — just ${initial}. Your biweekly service is ${recuring}, with the whole home cleaned every visit.
-
-Let me know if you’d like to get on the schedule and if you have any preferred days or times. Our calendar fills up quickly (especially for the longer initial clean), but we still have a few {date_month} spots available. What works best for you?
-
-We look forward to cleaning for you!
-{username}
-""", f"""Hi {name}!
-
-We’re excited to help make your home feel fresh and spotless!
-
-Normally, your initial reset clean would be ${initial*2},
-but with our {date_month} special, it’s 50% off — just ${initial}. Your monthly service is ${recuring}, with the whole home cleaned every visit.
-
-Let me know if you’d like to get on the schedule and if you have any preferred days or times. Our calendar fills up quickly (especially for the longer initial clean), but we still have a few {date_month} spots available. What works best for you?
-
-We look forward to cleaning for you!
-{username}
-""", f"""Hi {name},
-
-Thank you for reaching out about cleans! We'd love to help!
-
-It looks like the address you provided is in Salem which is outside of our service area. Do you have an address that is closer to the Portland Metro area? Let me know and we'd love to help you with your cleaning needs!
-
-Best,
-
-{username}"""]
-    return scripts[part_list]
-
-
-def get_quote_dfw(date_month, initial, recuring, part_list, name="there", username="", city=""):
-    scripts = [f"""Hi {name},
-    
-We’re excited to help make your home feel fresh and spotless!
-
-Based on the info you provided and our {date_month} special, your one-time clean will be ${initial} before sales tax (Includes washing all interior window panes within arms reach!)
-
-•         Would you like any extras like fridge, oven, window blind or track cleaning?
-
-•         Are there any other cleaning needs/notes you would like for me to add to our list?
-
-Every technician on our team is background-checked, highly trained, and IICRC-certified, with great communication skills — so you can count on professionalism and care with every visit.
-
-Let me know if you would like to get on the schedule and if you have any preferred days/times. Our schedule fills up quickly (especially for the longer initial clean!), but we still have a few spots in {date_month}! What works best?
-
-We look forward to cleaning for you!
-{username}""", f"""Hi {name},
-    
-We’re excited to help make your home feel fresh and spotless!
-Based on the info you provided and our {date_month} special, your moving clean will be ${initial} before sales tax (Includes washing all interior window panes within arms reach!)
-
-•         Would you like any extras like fridge, oven, window blind or track cleaning?
-
-•         Are there any other cleaning needs/notes you would like for me to add to our list?
-
-Every technician on our team is background-checked, highly trained, and IICRC-certified, with great communication skills — so you can count on professionalism and care with every visit.
-
-Let me know if you would like to get on the schedule and if you have any preferred days/times. Our schedule fills up quickly (especially for the longer initial clean!), but we still have a few spots in {date_month}! What works best?
-
-We look forward to cleaning for you!
-{username}""", f"""Hi {name},
-
-We’d love to help get your home fresh and spotless!
-
-With the special we are running for {date_month}, your first clean is ${recuring} before sales tax — the same rate as your weekly visits moving forward, with baseboards and interior windows included!
-
-All of our technicians are background-checked, highly trained, and IICRC-certified.
-
-{date_month} availability is limited — would you like me to hold an opening for you?
-
-Best,
-{username}  
-""", f"""Hi {name},
-
-We’d love to help get your home fresh and spotless!
-
-With the special we are running for {date_month}, your first clean is ${recuring} before sales tax — the same rate as your biweekly visits moving forward, with baseboards and interior windows included!
-
-All of our technicians are background-checked, highly trained, and IICRC-certified.
-
-{date_month} availability is limited — would you like me to hold an opening for you?
-
-Best,
-{username} 
-""", f"""Hi {name},
-
-We’d love to help get your home fresh and spotless!
-
-With the special we are running for {date_month}, your first clean is ${recuring} before sales tax — the same rate as your monthly visits moving forward, with baseboards and interior windows included!
-
-All of our technicians are background-checked, highly trained, and IICRC-certified.
-
-{date_month} availability is limited — would you like me to hold an opening for you?
-
-Best,
-{username}  
-""", f"""Hi {name},
-
-Thank you for reaching out about cleans! We'd love to help!
-
-It looks like the address you provided is in Salem which is outside of our service area. Do you have an address that is closer to the Portland Metro area? Let me know and we'd love to help you with your cleaning needs!
-
-Best,
-
-{username}"""]
-    return scripts[part_list]
-
-
-def get_title_manual(sqft, beds, baths, part_list):
-    sqft = int(sqft)
-    sqft = round(sqft / 10) * 10
-    beds = int(beds)
-    try:
-        baths = int(baths)
-    except ValueError:
-        baths = float(baths)
-
-    if beds <= 1 >= baths:
-        scripts = [f"One Time Clean {sqft} sqft, {beds} Bed, {baths} Bath",
-                   f"Move Clean {sqft} sqft, {beds} Bed, {baths} Bath",
-                   f"Weekly Cleans {sqft} sqft, {beds} Bed, {baths} Bath",
-                   f"Biweekly Cleans {sqft} sqft, {beds} Bed, {baths} Bath",
-                   f"Monthly Cleans {sqft} sqft, {beds} Bed, {baths} Bath"]
-    elif beds > 1 < baths:
-        scripts = [f"One Time Clean {sqft} sqft, {beds} Beds, {baths} Baths",
-                   f"Move Clean {sqft} sqft, {beds} Beds, {baths} Baths",
-                   f"Weekly Cleans {sqft} sqft, {beds} Beds, {baths} Baths",
-                   f"Biweekly Cleans {sqft} sqft, {beds} Beds, {baths} Baths",
-                   f"Monthly Cleans {sqft} sqft, {beds} Beds, {baths} Baths"]
-    elif beds > 1 >= baths:
-        scripts = [f"One Time Clean {sqft} sqft, {beds} Beds, {baths} Bath",
-                   f"Move Clean {sqft} sqft, {beds} Beds, {baths} Bath",
-                   f"Weekly Cleans {sqft} sqft, {beds} Beds, {baths} Bath",
-                   f"Biweekly Cleans {sqft} sqft, {beds} Beds, {baths} Bath",
-                   f"Monthly Cleans {sqft} sqft, {beds} Beds, {baths} Bath"]
-    else:
-        scripts = [f"One Time Clean {sqft} sqft, {beds} Bed, {baths} Baths",
-                   f"Move Clean {sqft} sqft, {beds} Bed, {baths} Baths",
-                   f"Weekly Cleans {sqft} sqft, {beds} Bed, {baths} Baths",
-                   f"Biweekly Cleans {sqft} sqft, {beds} Bed, {baths} Baths",
-                   f"Monthly Cleans {sqft} sqft, {beds} Bed, {baths} Baths"]
-
-    return scripts[part_list]
-
-
-def get_quote_text(date_month, initial, recuring, part_list, name="there", username="", sqft=0, beds=0, baths=0):
-    scripts = [f"""H {name}! {username} with Clean Affinity here! 
-Thank you for reaching out! 
-
-Based on your address it looks like {sqft} sqft, with {beds} beds and {baths} baths. If that’s correct, your one-time clean will be ${initial} with our {date_month} special. 
-
-Is this something I can get on the schedule for you?
-""", f"""Hi {name}! {username} with Clean Affinity here! 
-Thank you for reaching out! 
-
-Based on your address it looks like {sqft} sqft, with {beds} beds and {baths} baths. If that’s correct, your moving clean will be ${initial} with our {date_month} special. 
-
-Is this something I can get on the schedule for you?
-""", f"""Hi {name}! {username} with Clean Affinity here! 
-Thank you for reaching out! 
-
-Based on your address it looks like {sqft} sqft, with {beds} beds and {baths} baths. If that’s correct, your initial clean will be ${initial} and the following weekly cleans will be ${recuring} with our {date_month} special. 
-
-Is this something I can get on the schedule for you?
-""", f"""Hi {name}! {username} with Clean Affinity here! 
-Thank you for reaching out! 
-
-Based on your address it looks like {sqft} sqft, with {beds} beds and {baths} baths. If that’s correct, your initial clean will be ${initial} and the following biweekly cleans will be ${recuring} with our {date_month} special. 
-
-Is this something I can get on the schedule for you?
-""", f"""Hi {name}! {username} with Clean Affinity here! 
-Thank you for reaching out! 
-
-Based on your address it looks like {sqft} sqft, with {beds} beds and {baths} baths. If that’s correct, your initial clean will be ${initial} and the following monthly cleans will be ${recuring} with our {date_month} special. 
-
-Is this something I can get on the schedule for you?
-"""]
-    return scripts[part_list]
-
-
-def failed(date_month, username=""):
-    scripts = f"""Hi there!
-
-We’re excited to help make your home feel fresh and spotless!
-
-Could you provide the number of bedrooms and bathrooms along with the square footage of the house so I can put a quote together for you?
-
-Please let me know if you have any preferred days/times. Our schedule fills up quickly (especially for the longer initial clean!), but we still have a few spots in {date_month}!
-
-We look forward to cleaning for you!
-
-{username}
-"""
-    return scripts
+    name_section = ""
+    if name_first.strip() and name_first.strip():
+        name_section = f"{name_last}, {name_first} - "
+
+    send_type_clean = type_clean
+    if type_clean == "ot":
+        send_type_clean = "onetime"
+
+    title_template = get_title("quote_text", market, send_type_clean)
+    body_template = get_email_script("quote_text", market, send_type_clean)
+
+    body = body_template.format(
+        name=name_first,
+        last=name_last,
+        first=name_first,
+        date_month=month,
+        initial=round(elite),  # discounted
+        initial_full=round(elite * 2),  # FULL price before discount
+        recurring=round(ongoing),
+        username=username
+    )
+
+    title = title_template.format(
+        name_section=name_section,
+        sqft=sqft,
+        beds=clean_number(beds),
+        baths=clean_number(baths)
+    )
+
+    return title, body
