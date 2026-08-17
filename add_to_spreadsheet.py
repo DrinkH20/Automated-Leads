@@ -6,9 +6,6 @@ import base64
 from email.mime.text import MIMEText
 import logging
 import os
-import pickle
-from google.auth.transport.requests import Request
-from google_auth_oauthlib.flow import InstalledAppFlow
 # Install google-api-python-client
 from googleapiclient.discovery import build
 from email.utils import formataddr
@@ -19,15 +16,16 @@ from server_price_connect import update_servers
 import unicodedata
 from quoting import batch_get_quotes
 from script_loader import get_email_script, get_title
+from gmail_auth import get_gmail_credentials
 
 # ot, initial, move, monthly, biweekly, weekly = 0,0,0,0,0,0
 
 
-SCOPES = ['https://www.googleapis.com/auth/gmail.readonly', 'https://www.googleapis.com/auth/gmail.compose']
+# Gmail scopes. These must also be authorized for the service account's client ID
+# under Domain-wide delegation in Workspace Admin -- see gmail_auth.py.
+SCOPES = ['https://www.googleapis.com/auth/gmail.readonly', 'https://www.googleapis.com/auth/gmail.compose', 'https://www.googleapis.com/auth/gmail.modify']
 
 BASE_DIR = os.getenv("APP_BASE_DIR", os.path.dirname(os.path.abspath(__file__)))
-CREDENTIALS_FILE = os.path.join(BASE_DIR, "credentials", "google_secrets.json")
-TOKEN_FILE = 'token.pickle'
 
 
 logging.basicConfig(level=logging.DEBUG)
@@ -489,31 +487,8 @@ def create_draft(service, sender_name, sender, subject, message_text, receiver, 
 
 def authenticate_gmail():
     try:
-        creds = None
         logging.debug("Starting authentication process.")
-
-        # Check if token.pickle exists
-        if os.path.exists(TOKEN_FILE):
-            logging.debug("Found existing token file. Loading credentials.")
-            with open(TOKEN_FILE, 'rb') as token:
-                creds = pickle.load(token)
-
-        # If no valid credentials, perform OAuth flow
-        if not creds or not creds.valid:
-            logging.debug("No valid credentials found or credentials are invalid/expired.")
-            if creds and creds.expired and creds.refresh_token:
-                logging.debug("Credentials are expired, attempting to refresh.")
-                creds.refresh(Request())
-            else:
-                logging.debug("Running OAuth flow to obtain new credentials.")
-                flow = InstalledAppFlow.from_client_secrets_file(CREDENTIALS_FILE, SCOPES)
-                creds = flow.run_local_server(port=0)
-
-            # Save the credentials for future use
-            with open(TOKEN_FILE, 'wb') as token:
-                logging.debug("Saving new credentials to token file.")
-                pickle.dump(creds, token)
-
+        creds = get_gmail_credentials(SCOPES)
         logging.debug("Authentication process completed.")
         return creds
     except Exception as e:
