@@ -229,6 +229,19 @@ def run_automation():
 
     chart_of_profitable = ['weekly', 'biweekly', 'monthly', 'move', 'onetime']
 
+    def profitability_rank(service_type):
+        """Rank a service type; lower wins. The lead form sends camelCase
+        ('biWeekly', 'oneTime') while this chart is lowercase, so normalize
+        before matching. An unknown type ranks last instead of raising --
+        the bare .index() call used to throw ValueError, and the handler
+        below swallowed it, silently dropping the lead.
+        """
+        try:
+            return chart_of_profitable.index((service_type or '').strip().lower())
+        except ValueError:
+            logging.warning("Unknown service type %r; ranking it last.", service_type)
+            return len(chart_of_profitable)
+
     def process_email_list(email_list, market):
         nonlocal all_leads, processed_message_ids, seen_leads
 
@@ -268,7 +281,7 @@ def run_automation():
                 # ---- Duplicate Handling ----
                 if email in seen_leads:
                     existing = seen_leads[email]
-                    if chart_of_profitable.index(service_type) < chart_of_profitable.index(existing[1]):
+                    if profitability_rank(service_type) < profitability_rank(existing[1]):
                         all_leads.remove(existing)
                         all_leads.append(lead)
                         seen_leads[email] = lead

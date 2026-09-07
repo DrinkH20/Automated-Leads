@@ -30,6 +30,20 @@ BASE_DIR = os.getenv("APP_BASE_DIR", os.path.dirname(os.path.abspath(__file__)))
 
 logging.basicConfig(level=logging.DEBUG)
 
+def _to_number(value):
+    """Return value as a float, or None if it can't be parsed.
+
+    Lead forms arrive with blank SQFT/bed/bath fields often enough that this
+    has to be non-fatal: None, "", "n/a" and "1,200" all reach here.
+    """
+    if value is None:
+        return None
+    try:
+        return float(str(value).replace(',', '').strip())
+    except (TypeError, ValueError):
+        return None
+
+
 def safe_state_place(sp):
     """Return (zone, city) from state_place, safely."""
     zone, city = "", ""
@@ -205,8 +219,20 @@ def revise_list(data, mark, dfw_count, pdx_pricing, dfw_pricing):
         # else:
         #     quotes_to_run_pdx.append(((sqft, bed, bath), stype_idx, first_name, last_name,
         #                          "Joel", city, "DFW"))
+        # A lead form submitted with a blank SQFT/bed/bath arrives here as None.
+        # int(float(None)) raises TypeError, which aborted the whole run and took
+        # every other lead in the batch with it. The lead still goes on the sheet;
+        # it just gets no quote, because a quote without square footage is noise.
+        sqft_n, bed_n, bath_n = _to_number(sqft), _to_number(bed), _to_number(bath)
+        if sqft_n is None or bed_n is None or bath_n is None:
+            logging.warning(
+                "No quote for %s: incomplete sqft/bed/bath (%r/%r/%r)",
+                email, sqft, bed, bath
+            )
+            continue
+
         quote_tuple = (
-            (sqft, bed, bath),
+            (sqft_n, bed_n, bath_n),
             stype_idx,
             first_name,
             last_name,
