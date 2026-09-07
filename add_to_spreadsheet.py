@@ -79,18 +79,6 @@ def parse_lead_line(text):
     stype = m.group("stype").strip()
     return name, stype
 
-def normalize_service_type(raw):
-    s = (raw or "").strip().upper()
-    s = re.sub(r"[\s\-]", "", s)
-    aliases = {
-        "ONETIME":"ONETIME", "ONCE":"ONETIME", "ONEOFF":"ONETIME",
-        "MOVE":"MOVE","MOVEIN":"MOVE","MOVEOUT":"MOVE",
-        "WEEKLY":"WEEKLY",
-        "BIWEEKLY":"BIWEEKLY","EOW":"BIWEEKLY","EVERYOTHERWEEK":"BIWEEKLY","EVERY2WEEKS":"BIWEEKLY",
-        "MONTHLY":"MONTHLY","EVERY4WEEKS":"MONTHLY","4WEEK":"MONTHLY",
-    }
-    return aliases.get(s)
-
 def split_name(name):
     if not name:
         return "", ""

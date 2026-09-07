@@ -32,6 +32,14 @@ SEND_EMAILS = True  # ← set to True when ready to send
 
 logging.basicConfig(level=logging.DEBUG)
 
+# Nearly every line of the 866MB log this grew into was one of these libraries
+# narrating an HTTP request, once a minute, forever. Application DEBUG stays on;
+# the transport chatter does not. Raise these back to DEBUG when tracing an API
+# problem specifically.
+for _noisy in ('googleapiclient.discovery', 'googleapiclient.discovery_cache',
+               'google_auth_httplib2', 'urllib3'):
+    logging.getLogger(_noisy).setLevel(logging.WARNING)
+
 BASE_DIR = os.getenv("APP_BASE_DIR", os.path.dirname(os.path.abspath(__file__)))
 
 # Gmail API scopes. These must also be authorized for the service account's
@@ -45,6 +53,10 @@ quotes_to_run = []
 def clear_label_from_all_messages(service, label_id):
     """
     Remove a label from ALL messages that currently have it.
+
+    Manual maintenance helper -- deliberately NOT called during a run. Used at
+    the end of run_automation it discarded every lead that had failed, since it
+    cannot tell a processed message from a skipped one.
     """
     page_token = None
 
@@ -199,10 +211,9 @@ def run_automation():
     # label_ids = get_label_ids_by_name(service, ['LeadsNotYetContacted', 'DFW', 'PHX'])
     label_ids = get_label_ids_by_name(
         service,
-        ['Automations', 'DFW', 'PHX', 'Automated Email Sent']
+        ['Automations', 'DFW', 'PHX']
     )
     lead_label_id = label_ids.get('Automations')
-    sent_label_id = label_ids.get('Automated Email Sent')
     dfw_label_id = label_ids.get('DFW')
     phx_label_id = label_ids.get('PHX')
 
@@ -458,10 +469,12 @@ def run_automation():
 
     logging.info("Automation run complete.")
 
-    # Sweep Automations queue clean
-    if lead_label_id:
-        clear_label_from_all_messages(service, lead_label_id)
-        logging.info("Cleared Automations label from all emails.")
+    # Nothing sweeps the Automations queue here on purpose. The loop above
+    # already unlabels every message that actually processed, so anything still
+    # carrying the label failed and should be retried on the next run. A blanket
+    # sweep used to run at this point and discarded those leads permanently --
+    # a single malformed lead could take a whole batch down with it, unlogged
+    # and unrecoverable.
 
 
 def parse_email_details(text, mark):

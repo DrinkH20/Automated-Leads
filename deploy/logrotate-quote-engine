@@ -1,0 +1,22 @@
+# Log rotation for the quote engine.
+#
+# Install on the droplet:
+#     cp /opt/quote_engine_current/deploy/logrotate-quote-engine /etc/logrotate.d/quote-engine
+#     logrotate -d /etc/logrotate.d/quote-engine    # dry run, prints what it would do
+#     logrotate -f /etc/logrotate.d/quote-engine    # force one rotation now
+#
+# Real path, not the /opt/quote_engine_current symlink, so rotation does not
+# depend on where that link happens to point.
+
+/opt/quote_engine_repo/automation.log {
+    daily
+    maxsize 100M
+    rotate 7
+    compress
+    delaycompress
+    missingok
+    notifempty
+    # runner.sh reopens the log with >> every minute, so copytruncate keeps the
+    # active append safe rather than leaving cron writing to an unlinked inode.
+    copytruncate
+}
