@@ -92,6 +92,46 @@ def authenticate_gmail():
         return None
 
 
+def relabel_messages(service, message_ids, add_label_name):
+    """Move messages out of the Automations queue onto add_label_name.
+
+    Creates the destination label if it does not exist yet. Leaving a message
+    in the queue is what triggers a retry next run, so every message that
+    reached a final state -- emailed or deliberately skipped -- must come
+    through here, or it will be reprocessed every minute forever.
+    """
+    if not message_ids:
+        return
+
+    label_ids = get_label_ids_by_name(service, ["Automations", add_label_name])
+    remove_label_id = label_ids.get("Automations")
+    add_label_id = label_ids.get(add_label_name)
+
+    if not add_label_id:
+        add_label_id = service.users().labels().create(
+            userId='me',
+            body={
+                "name": add_label_name,
+                "labelListVisibility": "labelShow",
+                "messageListVisibility": "show"
+            }
+        ).execute()["id"]
+
+    for msg_id in message_ids:
+        try:
+            service.users().messages().modify(
+                userId='me',
+                id=msg_id,
+                body={
+                    "removeLabelIds": [remove_label_id] if remove_label_id else [],
+                    "addLabelIds": [add_label_id]
+                }
+            ).execute()
+            logging.debug(f"Moved message {msg_id} to {add_label_name}")
+        except Exception as e:
+            logging.error(f"Failed to update labels for {msg_id}: {e}")
+
+
 def get_label_ids_by_name(service, label_names):
     """
     Returns a dict mapping label name → label ID
@@ -236,6 +276,7 @@ def run_automation():
 
     all_leads = []
     processed_message_ids = []
+    skipped_message_ids = []
     seen_leads = {}  # email -> lead tuple
 
     chart_of_profitable = ['weekly', 'biweekly', 'monthly', 'move', 'onetime']
@@ -254,7 +295,7 @@ def run_automation():
             return len(chart_of_profitable)
 
     def process_email_list(email_list, market):
-        nonlocal all_leads, processed_message_ids, seen_leads
+        nonlocal all_leads, processed_message_ids, skipped_message_ids, seen_leads
 
         for msg in email_list:
             if 'body' not in msg:
@@ -267,6 +308,11 @@ def run_automation():
                 )
 
                 if not lead:
+                    # parse_email_details returns None only for an address
+                    # outside the service zone. That is permanent, not a
+                    # transient failure, so retrying it every minute would
+                    # never succeed. File it for review and unqueue it.
+                    skipped_message_ids.append(msg['id'])
                     continue
 
 
@@ -429,45 +475,16 @@ def run_automation():
             logging.error(f"Failed to send/label email to {receiver_email}: {e}")
 
     # ---- Remove Label After Processing ----
-    if processed_message_ids:
+    # Emailed leads and out-of-zone leads both leave the queue; only the label
+    # they land on differs. Anything still carrying Automations after this
+    # failed unexpectedly and gets retried on the next run.
+    relabel_messages(service, processed_message_ids, "AutomatedEmailSent")
+    relabel_messages(service, skipped_message_ids, "AutomationSkipped")
 
-        # Fetch both label IDs once
-        label_ids = get_label_ids_by_name(
-            service,
-            ["Automations", "AutomatedEmailSent"]
-        )
-
-        remove_label_id = label_ids.get("Automations")
-        add_label_id = label_ids.get("AutomatedEmailSent")
-
-        # Optional: auto-create the label if it doesn't exist
-        if not add_label_id:
-            add_label_id = service.users().labels().create(
-                userId='me',
-                body={
-                    "name": "AutomatedEmailSent",
-                    "labelListVisibility": "labelShow",
-                    "messageListVisibility": "show"
-                }
-            ).execute()["id"]
-
-        for msg_id in processed_message_ids:
-            try:
-                service.users().messages().modify(
-                    userId='me',
-                    id=msg_id,
-                    body={
-                        "removeLabelIds": [remove_label_id] if remove_label_id else [],
-                        "addLabelIds": [add_label_id] if add_label_id else []
-                    }
-                ).execute()
-
-                logging.debug(f"Updated labels for message {msg_id}")
-
-            except Exception as e:
-                logging.error(f"Failed to update labels for {msg_id}: {e}")
-
-    logging.info("Automation run complete.")
+    logging.info(
+        "Automation run complete. %d emailed, %d skipped as out of zone.",
+        len(processed_message_ids), len(skipped_message_ids)
+    )
 
     # Nothing sweeps the Automations queue here on purpose. The loop above
     # already unlabels every message that actually processed, so anything still
