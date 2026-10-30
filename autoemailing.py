@@ -14,6 +14,7 @@ import re
 from mapcodes import get_zone
 from add_to_spreadsheet import add_to_spreadsheet, create_draft
 from gmail_auth import get_gmail_credentials
+import ghl_sync
 
 # To Auto run - crontab -e - remove the hash infront of * * * * * cd /opt/quote_engine && /opt/quote_engine/venv/bin/python autoemailing.py >> /opt/quote_engine/automation.log 2>&1
 
@@ -423,7 +424,11 @@ def run_automation():
     user_info = service.users().getProfile(userId='me').execute()
     sender_email = user_info['emailAddress']
 
-    for sub, body_text, receiver_email, lead_market in draft_list:
+    ghl_quotes = []
+
+    for sub, body_text, receiver_email, lead_market, ghl_quote in draft_list:
+
+        ghl_quotes.append(ghl_quote)
 
         logging.info(f"Creating draft for {receiver_email}")
 
@@ -473,6 +478,11 @@ def run_automation():
 
         except Exception as e:
             logging.error(f"Failed to send/label email to {receiver_email}: {e}")
+
+    # ---- Hand quotes to GoHighLevel ----
+    # After the emails, and never raises: a GHL problem cannot change how
+    # leads are emailed or labelled. Off unless GHL_SYNC is set in .env.
+    ghl_sync.sync_quotes(ghl_quotes)
 
     # ---- Remove Label After Processing ----
     # Emailed leads and out-of-zone leads both leave the queue; only the label
@@ -578,8 +588,9 @@ def parse_email_details(text, mark):
     # ------------------------
     # UTM Extraction
     # ------------------------
-    # Pull the campaign code and the source code separately. The new "NEW LEAD"
-    # form lists them as "CAMPAIGN :" and "SOURCE :". Keys are matched only at
+    # Pull the campaign code and the source code separately. The "NEW LEAD"
+    # form lists them as "CAMPAIGN :" and "SOURCE :", and its newer version as
+    # "UTM CAMPAIGN:" and "UTM SOURCE:". Keys are matched only at
     # the start of a line so e.g. CAMPAIGN can't match inside "UTM2CampaignID";
     # colon and surrounding spaces are optional. Legacy UTM keys are kept as a
     # fallback so any straggler old-form emails still populate something.
@@ -596,8 +607,8 @@ def parse_email_details(text, mark):
                     return value
         return None
 
-    campaign_value = find_utm('CAMPAIGN', 'UTM2CampaignID', 'UTM4contentAdID')
-    source_value = find_utm('SOURCE', 'UTM1source', 'UTMreferrerURL')
+    campaign_value = find_utm('CAMPAIGN', 'UTM CAMPAIGN', 'UTM2CampaignID', 'UTM4contentAdID')
+    source_value = find_utm('SOURCE', 'UTM SOURCE', 'UTM1source', 'UTMreferrerURL')
 
 
     # Get zone safely

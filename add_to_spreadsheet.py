@@ -15,7 +15,8 @@ import re
 from server_price_connect import update_servers
 import unicodedata
 from quoting import batch_get_quotes
-from script_loader import get_email_script, get_title
+from script_loader import get_email_script, get_text_script, get_title
+import ghl_sync
 from gmail_auth import get_gmail_credentials
 
 # ot, initial, move, monthly, biweekly, weekly = 0,0,0,0,0,0
@@ -123,8 +124,10 @@ def normalize_service_type(raw):
     if s_compact in aliases:
         return aliases[s_compact]
 
-    # heuristic: if token contains a canonical word, pick it
-    for key in ["ONETIME", "MOVE", "WEEKLY", "BIWEEKLY", "MONTHLY"]:
+    # heuristic: if token contains a canonical word, pick it. BIWEEKLY must be
+    # tried before WEEKLY, which it contains -- otherwise "biweekly deep" was
+    # quoted at the weekly price.
+    for key in ["BIWEEKLY", "ONETIME", "MOVE", "MONTHLY", "WEEKLY"]:
         if key in s_compact:
             return key
 
@@ -180,8 +183,12 @@ def revise_list(data, mark, dfw_count, pdx_pricing, dfw_pricing):
         # Name & service parsing
         last_name, first_name = split_name(name)
         stype_norm = normalize_service_type(service_type)
+        service_known = bool(stype_norm)
         if not stype_norm:
-            # If we STILL can't normalize, default to ONETIME (or log & skip)
+            # The email still goes out as a one-time quote, as it always has,
+            # but loudly, and no text is sent for a service we had to guess.
+            logging.warning("Unknown service type %r for %s; emailing a one-time quote, text held.",
+                            service_type, email)
             stype_norm = "ONETIME"
         try:
             stype_idx = scripts_choose.index(stype_norm)
@@ -227,7 +234,11 @@ def revise_list(data, mark, dfw_count, pdx_pricing, dfw_pricing):
             "Joel",
             city,
             market,
-            email  # ← carry email with quote
+            email,  # ← carry email with quote
+            phone,
+            source_value,
+            service_known,
+            service_type
         )
 
         if market == "PDX":
@@ -300,6 +311,7 @@ def revise_list(data, mark, dfw_count, pdx_pricing, dfw_pricing):
             city = quote[5]
             market = quote[6]
             email = quote[7]  # ← now safe
+            phone, source_value, service_known, raw_service = quote[8:12]
 
             # email = revised_data[count]
             # email = email[13]
@@ -308,8 +320,9 @@ def revise_list(data, mark, dfw_count, pdx_pricing, dfw_pricing):
             # Pricing output for this quote
             pricing = result["output"]  # list of Decimals
 
-            # Call autocalc ONE quote at a time
-            sub, body_text = autocalc(
+            # Call autocalc ONE quote at a time. `fill` is what the email was
+            # filled from; the text is built from the same dict.
+            sub, body_text, fill, meta = autocalc(
                 int(float(sqft)),
                 int(float(bed)),
                 float(bath),
@@ -321,8 +334,22 @@ def revise_list(data, mark, dfw_count, pdx_pricing, dfw_pricing):
                 market,
                 pricing  # ← if your autocalc needs the pricing array
             )
+            # Building the text must never cost the lead their email.
+            try:
+                problems = [] if service_known else [f"unknown service type {raw_service!r}"]
+                sms_text, problem = build_text(market, meta["send_type"], fill)
+                if problem:
+                    problems.append(problem)
+                ghl_quote = ghl_sync.build_quote(
+                    market, first_name, last_name, email, phone, fill, meta,
+                    sms_text, problems, source_value
+                )
+            except Exception as e:
+                logging.error("Could not prepare text quote for %s: %s", email, e)
+                ghl_quote = None
+
             # draft_list.append((sub, body_text, email))
-            draft_list.append((sub, body_text, email, market))
+            draft_list.append((sub, body_text, email, market, ghl_quote))
 
             final_outputs.append({
                 "name": f"{first_name} {last_name}",
@@ -607,47 +634,79 @@ def clean_number(value):
     return value
 
 
-def autocalc(sqft, beds, baths, type_clean_numerical, name_first, name_last, username, city, market, pricing):
+def quote_values(sqft, beds, baths, type_clean_numerical, name_first, name_last, username, pricing):
+    """
+    The final quote, calculated once. Returns (fill, meta):
+      fill -- every placeholder the scripts sheet can use, for the email
+              title, the email body and the text alike, so all three always
+              show the same numbers.
+      meta -- which prices this service uses, unrounded, for validation.
+    """
     # For some reason the type clean is off by +1 on each quote so biweekly = weekly pricing etc.
     type_converter = ['', 'initial', 'ot', 'move', 'weekly', 'biweekly', 'monthly']
-    type_clean = type_converter[type_clean_numerical+2]
-    type_clean_price = type_converter[type_clean_numerical + 2]
-    initial = pricing['initial']
-    ongoing = pricing[type_clean_price]
+    type_clean = type_converter[type_clean_numerical + 2]
+    ongoing = pricing[type_clean]
 
     if type_clean not in ("ot", "move"):
-        elite = initial
-
+        elite = pricing['initial']
     else:
-        elite = pricing[type_clean_price]
+        elite = ongoing
 
     name_section = ""
     if name_first.strip() and name_first.strip():
         name_section = f"{name_last}, {name_first} - "
 
-    send_type_clean = type_clean
-    if type_clean == "ot":
-        send_type_clean = "onetime"
+    fill = {
+        "name": name_first,
+        "last": name_last,
+        "first": name_first,
+        "date_month": month,
+        "initial": round(elite),  # discounted
+        "initial_full": round(elite * 2),  # FULL price before discount
+        "recurring": round(ongoing),
+        "username": username,
+        "name_section": name_section,
+        "sqft": sqft,
+        "beds": clean_number(beds),
+        "baths": clean_number(baths),
+    }
+    meta = {
+        "type_clean": type_clean,
+        "send_type": "onetime" if type_clean == "ot" else type_clean,
+        "elite": elite,
+        "ongoing": ongoing,
+    }
+    return fill, meta
 
-    title_template = get_title("quote_text", market, send_type_clean)
-    body_template = get_email_script("quote_text", market, send_type_clean)
 
-    body = body_template.format(
-        name=name_first,
-        last=name_last,
-        first=name_first,
-        date_month=month,
-        initial=round(elite),  # discounted
-        initial_full=round(elite * 2),  # FULL price before discount
-        recurring=round(ongoing),
-        username=username
-    )
+def build_text(market, send_type, fill):
+    """
+    Fill the scripts sheet's texting wording for this market and service.
+    Returns (text, None), or (None, reason) when the text must be held: no
+    row, an empty texting cell, or a placeholder this code doesn't supply.
+    """
+    try:
+        template = get_text_script("quote_text", market, send_type)
+    except ValueError as e:
+        return None, f"no texting wording: {e}"
+    if not template.strip():
+        return None, f"texting cell is empty for {market} {send_type}"
+    try:
+        return template.format(**fill).strip(), None
+    except KeyError as e:
+        return None, f"unknown placeholder {{{e.args[0]}}} in {market} {send_type} texting wording"
+    except (IndexError, ValueError) as e:
+        return None, f"{market} {send_type} texting wording could not be filled: {e}"
 
-    title = title_template.format(
-        name_section=name_section,
-        sqft=sqft,
-        beds=clean_number(beds),
-        baths=clean_number(baths)
-    )
 
-    return title, body
+def autocalc(sqft, beds, baths, type_clean_numerical, name_first, name_last, username, city, market, pricing):
+    fill, meta = quote_values(sqft, beds, baths, type_clean_numerical,
+                              name_first, name_last, username, pricing)
+
+    title_template = get_title("quote_text", market, meta["send_type"])
+    body_template = get_email_script("quote_text", market, meta["send_type"])
+
+    body = body_template.format(**fill)
+    title = title_template.format(**fill)
+
+    return title, body, fill, meta
