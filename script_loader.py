@@ -94,8 +94,51 @@ def get_email_script(key, market, type_):
     return get_script(key, market, type_, field="script")
 
 
+# Auto-text wording lives on its own tab: one row per key/type, one column
+# per market. (The market tabs' "texting" column is no longer used.)
+AUTO_TEXT_TAB = "AUTO TEXT SCRIPTS"
+AUTO_TEXT_CACHE = {}
+
+
+def load_auto_text_scripts():
+    if AUTO_TEXT_CACHE:
+        return AUTO_TEXT_CACHE
+
+    creds = Credentials.from_service_account_file(
+        resource_path("credentials/google_secrets.json"),
+        scopes=["https://www.googleapis.com/auth/spreadsheets.readonly"]
+    )
+    service = build("sheets", "v4", credentials=creds)
+    values = service.spreadsheets().values().get(
+        spreadsheetId=SHEET_ID,
+        range=f"'{AUTO_TEXT_TAB}'"
+    ).execute().get("values", [])
+
+    if not values:
+        return AUTO_TEXT_CACHE
+
+    headers = [h.strip().upper() for h in values[0]]
+    for row in values[1:]:
+        row_dict = {
+            headers[i]: row[i] if i < len(row) else ""
+            for i in range(len(headers))
+        }
+        key_tuple = (row_dict["KEY"].strip().lower(), row_dict["TYPE"].strip().upper())
+        AUTO_TEXT_CACHE[key_tuple] = {
+            h: v for h, v in row_dict.items() if h not in ("KEY", "TYPE")
+        }
+
+    return AUTO_TEXT_CACHE
+
+
 def get_text_script(key, market, type_):
-    return get_script(key, market, type_, field="texting")
+    market = market.upper()
+    entry = load_auto_text_scripts().get((key.lower(), str(type_).upper()))
+    if entry is None:
+        raise ValueError(f"No auto text script found for key={key}, type={type_}")
+    if market not in entry:
+        raise ValueError(f"No {market} column on the {AUTO_TEXT_TAB} tab")
+    return entry[market]
 
 
 def get_title(key, market, type_):

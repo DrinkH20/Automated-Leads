@@ -202,10 +202,47 @@ def safe_update(sheet, range_name, values, retries=5):
             else:
                 raise
 
+ESTIMATOR_LOCK_PATH = os.getenv("ESTIMATOR_LOCK_PATH", "/tmp/quote_engine_estimator.lock")
+
+
+class estimator_lock:
+    """
+    Hold an exclusive lock while a market's Estimator tab is in use.
+
+    Every quote writes the same E3:E5 cells and reads the same output cells, so
+    two processes quoting at once could read each other's prices. Cron's
+    `flock -n /tmp/quote_engine.lock` already keeps scheduled runs apart; this
+    also covers a manual run started while cron is mid-run. It is a separate
+    lock file on purpose: re-locking cron's file from inside the run it guards
+    would block against itself. No-op on Windows (local development).
+    """
+
+    def __enter__(self):
+        try:
+            import fcntl
+        except ImportError:
+            self._f = None
+            return self
+        self._f = open(ESTIMATOR_LOCK_PATH, "w")
+        fcntl.flock(self._f, fcntl.LOCK_EX)  # waits for the other run to finish
+        return self
+
+    def __exit__(self, *exc):
+        if self._f:
+            import fcntl
+            fcntl.flock(self._f, fcntl.LOCK_UN)
+            self._f.close()
+
+
 def batch_get_quotes(market, quotes_list):
     """
     Quota-safe batch quote engine using Google Sheets calculation.
     """
+    with estimator_lock():
+        return _batch_get_quotes(market, quotes_list)
+
+
+def _batch_get_quotes(market, quotes_list):
 
     import gspread
     from oauth2client.service_account import ServiceAccountCredentials

@@ -22,3 +22,6 @@ venv/
 
 # Runtime cache (regenerated from the geocoding API)
 geocode_cache.json
+
+# GHL handoff ledger (retry state + held-for-review list)
+ghl_ledger.sqlite3
