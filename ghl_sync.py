@@ -459,7 +459,7 @@ def _hand_off(conn, quote, run_mode):
     if saved.get("quote_id") == quote["quote_id"]:
         if QUOTE_TEXTED_TAG in _tags(contact):
             _record(conn, quote, "sent", "recovered", contact_id)
-            return "sent"
+            return "recovered"
         _record(conn, quote, "held", "send outcome unknown; check the contact's conversation", contact_id)
         return "held"
 
@@ -532,13 +532,16 @@ def _hand_off(conn, quote, run_mode):
     return "sent"
 
 
-def sync_quotes(quotes):
+def sync_quotes(quotes, on_sent=None):
     """
     Hand new quotes, plus earlier waiting/failed ones, to GHL.
 
     Never raises: nothing here may affect the email run. Failures are retried
     up to MAX_ATTEMPTS; quotes waiting on the contact or its consent tag are
     retried for CONSENT_WAIT_MINUTES.
+
+    on_sent(quote) is called once for each text sent in this run (e.g. to mark
+    the lead sheet); its errors are logged and ignored.
     """
     run_mode = mode()
     if run_mode == "off":
@@ -574,6 +577,12 @@ def sync_quotes(quotes):
                 status = _hand_off(conn, quote, run_mode)
                 logging.info("GHL %s quote %s for %s: %s",
                              quote["market"], quote["quote_id"], quote["email"], status)
+                if status == "sent" and on_sent:
+                    try:
+                        on_sent(quote)
+                    except Exception as e:
+                        logging.error("Text sent to %s, but after-send step failed: %s",
+                                      quote["email"], e)
             except Exception as e:
                 _record(conn, quote, "failed", str(e)[:500], failed=True)
                 logging.error("GHL handoff failed for %s (%s): %s",

@@ -15,7 +15,8 @@ load_dotenv()
 import logging  # noqa: E402
 
 import ghl_sync  # noqa: E402
+from add_to_spreadsheet import mark_lead_texted  # noqa: E402
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-    ghl_sync.sync_quotes([])
+    ghl_sync.sync_quotes([], on_sent=mark_lead_texted)

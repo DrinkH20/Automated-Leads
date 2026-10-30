@@ -610,11 +610,13 @@ class QuietHours(Base):
         _, q = self.quote()
         ghl_sync.sync_quotes([q])
         self.hours_open = True
-        with mock.patch.object(ats, "batch_get_quotes", side_effect=AssertionError("no quoting")):
+        marked = []
+        with mock.patch.object(ats, "batch_get_quotes", side_effect=AssertionError("no quoting")),                 mock.patch.object(ats, "mark_lead_texted", marked.append):
             runpy.run_path(os.path.join(os.path.dirname(__file__), "..", "send_queued_texts.py"),
                            run_name="__main__")
         self.assertEqual(self.status(q)[0], "sent")
         self.assertEqual(len(self.ghl.sms), 1)
+        self.assertEqual([m["quote_id"] for m in marked], [q["quote_id"]])
 
     def test_too_old_is_held_even_once_hours_reopen(self):
         # e.g. the server was stopped for a day and comes back mid-morning
@@ -641,6 +643,65 @@ class QuietHours(Base):
         with mock.patch.dict(os.environ, {"GHL_SYNC": "fields"}):
             ghl_sync.sync_quotes([q])
         self.assertIn("would send after", self.status(q)[1])
+
+
+class LeadSheetMarking(Base):
+    """'emailed' becomes 'emailed/texted' on the lead sheet only once a text has gone out."""
+
+    def setUp(self):
+        super().setUp()
+        self.ghl.add_contact("loc_pdx")
+        self.marked = []
+
+    def sync(self, *quotes):
+        ghl_sync.sync_quotes(list(quotes), on_sent=self.marked.append)
+
+    def test_marked_once_when_sent(self):
+        _, q = self.quote()
+        self.sync(q)
+        self.sync(q)
+        self.sync()
+        self.assertEqual([m["quote_id"] for m in self.marked], [q["quote_id"]])
+
+    def test_not_marked_while_scheduled_then_marked_when_sent(self):
+        _, q = self.quote()
+        self.hours_open = False
+        self.sync(q)
+        self.assertEqual(self.marked, [])
+        self.hours_open = True
+        self.sync()
+        self.assertEqual(len(self.marked), 1)
+
+    def test_not_marked_without_consent_or_in_fields_mode(self):
+        self.ghl.contact("loc_pdx")["tags"] = []
+        self.sync(self.quote()[1])
+        self.ghl.contact("loc_pdx")["tags"] = ["auto text"]
+        with mock.patch.dict(os.environ, {"GHL_SYNC": "fields"}):
+            self.sync(self.quote(pricing=dict(PRICING, biweekly=Decimal(170)))[1])
+        self.assertEqual(self.marked, [])
+
+    def test_marking_failure_does_not_affect_the_send(self):
+        _, q = self.quote()
+        ghl_sync.sync_quotes([q], on_sent=mock.Mock(side_effect=RuntimeError("sheets down")))
+        self.assertEqual(self.status(q)[0], "sent")
+        self.sync()  # not retried, not resent
+        self.assertEqual(len(self.ghl.sms), 1)
+
+    def test_updates_newest_emailed_row_for_that_email(self):
+        emails = ["email", "ann@example.com", "bob@example.com", "ANN@example.com ", "cy@example.com"]
+        statuses = ["status", "emailed", "emailed", "emailed", "emailed"]
+        sheet = mock.Mock()
+        sheet.col_values.side_effect = lambda col: {14: emails, 5: statuses}[col]
+        with mock.patch("gspread.authorize") as auth,                 mock.patch("google.oauth2.service_account.Credentials.from_service_account_file"):
+            auth.return_value.open_by_key.return_value.worksheet.return_value = sheet
+            self.assertTrue(ats.mark_lead_texted({"market": "pdx", "email": "Ann@Example.com"}))
+            auth.return_value.open_by_key.return_value.worksheet.assert_called_with("PDX")
+            sheet.update_cell.assert_called_once_with(4, 5, "emailed/texted")
+
+            statuses[3] = "emailed/texted"; statuses[1] = "called"
+            sheet.update_cell.reset_mock()
+            self.assertFalse(ats.mark_lead_texted({"market": "PDX", "email": "ann@example.com"}))
+            sheet.update_cell.assert_not_called()
 
 
 class TrackingCodes(unittest.TestCase):

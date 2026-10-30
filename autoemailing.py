@@ -12,7 +12,7 @@ import base64
 from email.mime.text import MIMEText
 import re
 from mapcodes import get_zone
-from add_to_spreadsheet import add_to_spreadsheet, create_draft
+from add_to_spreadsheet import add_to_spreadsheet, create_draft, mark_lead_texted
 from gmail_auth import get_gmail_credentials
 import ghl_sync
 
@@ -482,7 +482,7 @@ def run_automation():
     # ---- Hand quotes to GoHighLevel ----
     # After the emails, and never raises: a GHL problem cannot change how
     # leads are emailed or labelled. Off unless GHL_SYNC is set in .env.
-    ghl_sync.sync_quotes(ghl_quotes)
+    ghl_sync.sync_quotes(ghl_quotes, on_sent=mark_lead_texted)
 
     # ---- Remove Label After Processing ----
     # Emailed leads and out-of-zone leads both leave the queue; only the label

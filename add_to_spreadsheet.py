@@ -550,6 +550,40 @@ def create_draft_route(subject, message_text, gmail, market):
     draft = create_draft(service, "Clean Affinity", sender_email, subject, message_text, gmail, market)
 
 
+LEAD_SHEET_ID = '1mZ0TseN9pucJEDvQXAzCtKUUgSWT8802SMEo-BfL3KU'
+STATUS_COL, EMAIL_COL = 5, 14  # E = "emailed", N = email (see revise_list)
+
+
+def mark_lead_texted(quote):
+    """
+    Once a quote text has gone out, change the lead's status cell on its
+    market tab from "emailed" to "emailed/texted". The text may go out hours
+    after the row was written (the 8am batch), so the row is found by email:
+    the newest row for that address still marked "emailed".
+    """
+    from google.oauth2.service_account import Credentials
+    import gspread
+
+    BASE_DIR = os.getenv("APP_BASE_DIR", os.path.dirname(os.path.abspath(__file__)))
+    creds = Credentials.from_service_account_file(
+        os.path.join(BASE_DIR, "credentials", "google_secrets.json"),
+        scopes=["https://www.googleapis.com/auth/spreadsheets"]
+    )
+    sheet = gspread.authorize(creds).open_by_key(LEAD_SHEET_ID).worksheet(quote["market"].upper())
+
+    email = (quote.get("email") or "").strip().lower()
+    emails = sheet.col_values(EMAIL_COL)
+    statuses = sheet.col_values(STATUS_COL)
+    for i in range(len(emails) - 1, -1, -1):
+        status = statuses[i].strip().lower() if i < len(statuses) else ""
+        if email and emails[i].strip().lower() == email and status == "emailed":
+            sheet.update_cell(i + 1, STATUS_COL, "emailed/texted")
+            return True
+    logging.warning("Texted %s, but found no 'emailed' row for them on the %s tab",
+                    email, quote["market"])
+    return False
+
+
 def add_to_spreadsheet(raw_data, mrkt, dfw_amount, pdx_prices, dfw_prices):
     from google.oauth2.service_account import Credentials
     import gspread
@@ -570,7 +604,7 @@ def add_to_spreadsheet(raw_data, mrkt, dfw_amount, pdx_prices, dfw_prices):
 
     client = gspread.authorize(creds)
 
-    spreadsheet_id = '1mZ0TseN9pucJEDvQXAzCtKUUgSWT8802SMEo-BfL3KU'
+    spreadsheet_id = LEAD_SHEET_ID
     sheet_name = 'Sheet1'
 
     # data = revise_list(raw_data, mrkt, dfw_amount, pdx_prices, dfw_prices)
