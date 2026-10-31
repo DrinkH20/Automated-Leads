@@ -532,6 +532,35 @@ def _hand_off(conn, quote, run_mode):
     return "sent"
 
 
+# Same order the email uses to pick between duplicate leads: best first.
+SERVICE_RANK = ("weekly", "biweekly", "monthly", "move", "onetime")
+
+
+def _rank(quote):
+    service = (quote["fields"].get("quote_service_type") or "").lower()
+    return SERVICE_RANK.index(service) if service in SERVICE_RANK else len(SERVICE_RANK)
+
+
+def _lead_keys(quote):
+    """Who a quote is for: the same email or phone in the same market."""
+    email = (quote.get("email") or "").strip().lower()
+    keys = {("email", quote["market"], email)} if email else set()
+    if quote.get("phone"):
+        keys.add(("phone", quote["market"], quote["phone"]))
+    return keys or {("quote", quote["market"], quote["quote_id"])}
+
+
+def _recently_texted(conn):
+    """Lead keys that were sent (or are mid-send of) a quote text in the last SCHEDULE_MAX_HOURS."""
+    cutoff = (_now() - timedelta(hours=SCHEDULE_MAX_HOURS)).isoformat()
+    keys = set()
+    for (payload,) in conn.execute(
+            "SELECT payload FROM ghl_quotes WHERE status IN ('sent','sending') AND updated_at > ?",
+            (cutoff,)):
+        keys |= _lead_keys(json.loads(payload))
+    return keys
+
+
 def sync_quotes(quotes, on_sent=None):
     """
     Hand new quotes, plus earlier waiting/failed ones, to GHL.
@@ -539,6 +568,11 @@ def sync_quotes(quotes, on_sent=None):
     Never raises: nothing here may affect the email run. Failures are retried
     up to MAX_ATTEMPTS; quotes waiting on the contact or its consent tag are
     retried for CONSENT_WAIT_MINUTES.
+
+    One quote text per lead: when the same person has several quotes open
+    (e.g. a weekly and a biweekly form, queued overnight together), only the
+    highest frequency is texted, in SERVICE_RANK order, and the others are
+    held. Nobody gets a second quote text within SCHEDULE_MAX_HOURS of one.
 
     on_sent(quote) is called once for each text sent in this run (e.g. to mark
     the lead sheet); its errors are logged and ignored.
@@ -553,23 +587,42 @@ def sync_quotes(quotes, on_sent=None):
         return
     try:
         queue = {q["quote_id"]: q for q in quotes if q}
+        not_due = set()
         for payload, status, first_seen in conn.execute(
                 "SELECT payload, status, first_seen FROM ghl_quotes "
                 "WHERE status IN ('pending','waiting','scheduled','failed') AND attempts < ?",
                 (MAX_ATTEMPTS,)).fetchall():
             q = json.loads(payload)
+            queue.setdefault(q["quote_id"], q)
             # Scheduled quotes sit untouched until they are due, instead of
             # re-checking GHL every minute all night.
             if status == "scheduled" and not texting_open(
                     q["market"], since=datetime.fromisoformat(first_seen)):
-                queue.pop(q["quote_id"], None)
-                continue
-            queue.setdefault(q["quote_id"], q)
+                not_due.add(q["quote_id"])
 
+        open_quotes = []
         for quote in queue.values():
             row = conn.execute("SELECT status FROM ghl_quotes WHERE quote_id=?",
                                (quote["quote_id"],)).fetchone()
-            if row and row[0] in FINAL:
+            if not (row and row[0] in FINAL):
+                open_quotes.append((quote, row))
+        open_quotes.sort(key=lambda qr: _rank(qr[0]))  # stable: ties keep their order
+
+        texted = _recently_texted(conn)
+        chosen = {}  # lead key -> service type of the quote kept for that lead
+        for quote, row in open_quotes:
+            keys = _lead_keys(quote)
+            if keys & texted or keys & chosen.keys():
+                reason = ("this lead was already texted a quote in the last "
+                          f"{SCHEDULE_MAX_HOURS}h" if keys & texted else
+                          "superseded by this lead's "
+                          f"{chosen[next(iter(keys & chosen.keys()))]} quote")
+                _record(conn, quote, "held", reason)
+                logging.info("Text not sent to %s (%s): %s", quote["email"], quote["market"], reason)
+                continue
+            for key in keys:
+                chosen[key] = quote["fields"].get("quote_service_type") or "other"
+            if quote["quote_id"] in not_due:
                 continue
             try:
                 if not row:

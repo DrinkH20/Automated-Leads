@@ -162,14 +162,14 @@ class Base(unittest.TestCase):
         shutil.rmtree(self.tmp, ignore_errors=True)
 
     def quote(self, market="PDX", service="BIWEEKLY", pricing=PRICING,
-              phone="503-555-1234", service_known=True):
+              phone="503-555-1234", service_known=True, email=EMAIL):
         idx = SCRIPT_TYPES.index(service)
         sub, body, fill, meta = ats.autocalc(1500, 3.0, 2.0, idx, "Ann", "Lee", "Joel", "Portland", market, pricing)
         problems = [] if service_known else ["unknown service type 'deep'"]
         text, problem = ats.build_text(market, meta["send_type"], fill)
         if problem:
             problems.append(problem)
-        return body, ghl_sync.build_quote(market, "Ann", "Lee", EMAIL, phone,
+        return body, ghl_sync.build_quote(market, "Ann", "Lee", email, phone,
                                           fill, meta, text, problems, "")
 
     def status(self, quote):
@@ -445,14 +445,25 @@ class Retries(Base):
         self.assertEqual(self.status(q)[0], "sent")
         self.assertEqual(len(self.ghl.sms), 1)
 
-    def test_new_quote_for_same_contact_is_sent(self):
+    def test_new_quote_for_same_contact_is_not_texted_again_within_a_day(self):
         _, q1 = self.quote()
         ghl_sync.sync_quotes([q1])
         _, q2 = self.quote(pricing=dict(PRICING, biweekly=Decimal(160)))
         self.assertNotEqual(q1["quote_id"], q2["quote_id"])
         ghl_sync.sync_quotes([q2])
+        self.assertEqual(self.status(q2), ("held", "this lead was already texted a quote in the last 24h"))
+        self.assertEqual(len(self.ghl.sms), 1)
+
+    def test_new_quote_after_a_day_is_sent(self):
+        _, q1 = self.quote()
+        ghl_sync.sync_quotes([q1])
+        conn = sqlite3.connect(ghl_sync.LEDGER_PATH)
+        conn.execute("UPDATE ghl_quotes SET updated_at=?",
+                     ((datetime.now(timezone.utc) - timedelta(hours=25)).isoformat(),))
+        conn.commit(); conn.close()
+        _, q2 = self.quote(pricing=dict(PRICING, biweekly=Decimal(160)))
+        ghl_sync.sync_quotes([q2])
         self.assertEqual(self.status(q2)[0], "sent")
-        self.assertEqual(len(self.ghl.sms), 2)
         self.assertIn("$160", self.ghl.sms[1][2])
 
     def test_ghl_outage_is_retried_and_never_raises(self):
@@ -462,6 +473,59 @@ class Retries(Base):
         self.assertEqual(self.status(q)[0], "failed")
         ghl_sync.sync_quotes([])  # next run picks it up from the ledger
         self.assertEqual(self.status(q)[0], "sent")
+
+
+class OneTextPerLead(Base):
+    """Duplicate leads: text only the highest frequency, like the email does."""
+
+    def setUp(self):
+        super().setUp()
+        self.ghl.add_contact("loc_pdx")
+
+    def test_overnight_weekly_and_biweekly_send_only_weekly(self):
+        # The Bradford case: both forms queued overnight, released together at 8am.
+        for order in (("BIWEEKLY", "WEEKLY"), ("WEEKLY", "BIWEEKLY")):
+            with self.subTest(order=order):
+                self.ghl = FakeGHL()
+                self.ghl.add_contact("loc_pdx")
+                if os.path.exists(ghl_sync.LEDGER_PATH):
+                    os.remove(ghl_sync.LEDGER_PATH)
+                self.hours_open = False
+                quotes = {s: self.quote(service=s)[1] for s in order}
+                for s in order:
+                    ghl_sync.sync_quotes([quotes[s]])  # separate runs, evening
+                self.assertEqual(self.ghl.sms, [])
+                self.hours_open = True
+                ghl_sync.sync_quotes([])  # 8am
+                self.assertEqual(len(self.ghl.sms), 1)
+                self.assertEqual(self.status(quotes["WEEKLY"])[0], "sent")
+                self.assertEqual(self.status(quotes["BIWEEKLY"]),
+                                 ("held", "superseded by this lead's weekly quote"))
+
+    def test_same_run_picks_highest_frequency(self):
+        quotes = [self.quote(service=s)[1] for s in ("ONETIME", "MONTHLY", "MOVE", "BIWEEKLY")]
+        ghl_sync.sync_quotes(quotes)
+        self.assertEqual(len(self.ghl.sms), 1)
+        self.assertEqual(self.status(quotes[3])[0], "sent")
+
+    def test_same_phone_different_email_is_the_same_lead(self):
+        _, q1 = self.quote(service="WEEKLY")
+        _, q2 = self.quote(service="MONTHLY", email="other@example.com")
+        ghl_sync.sync_quotes([q2, q1])
+        self.assertEqual(len(self.ghl.sms), 1)
+        self.assertEqual(self.status(q1)[0], "sent")
+
+    def test_different_people_both_get_their_text(self):
+        self.ghl.add_contact("loc_pdx", "c2", email="bob@example.com", phone="+15035559999")
+        _, q1 = self.quote()
+        _, q2 = self.quote(email="bob@example.com", phone="503-555-9999")
+        ghl_sync.sync_quotes([q1, q2])
+        self.assertEqual(len(self.ghl.sms), 2)
+
+    def test_same_person_in_another_market_is_separate(self):
+        self.ghl.add_contact("loc_dfw")
+        ghl_sync.sync_quotes([self.quote()[1], self.quote(market="DFW")[1]])
+        self.assertEqual(len(self.ghl.sms), 2)
 
 
 class Modes(Base):
