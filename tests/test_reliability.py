@@ -112,10 +112,10 @@ class RunHook(unittest.TestCase):
     def run_main(self, preload=None, run=None):
         import runpy
         calls = []
-        with mock.patch("warmup.preload_all", preload or (lambda: None)), \
+        import autoemailing
+        with mock.patch.object(autoemailing, "preload_all", preload or (lambda: None)), \
                 mock.patch("health_alert.record_failure", lambda e: calls.append(("fail", e))), \
                 mock.patch("health_alert.record_success", lambda: calls.append(("ok",))):
-            import autoemailing
             with mock.patch.object(autoemailing, "run_automation", run or (lambda: None)):
                 path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                                     "autoemailing.py")
