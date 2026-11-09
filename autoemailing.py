@@ -15,6 +15,7 @@ from mapcodes import get_zone
 from add_to_spreadsheet import add_to_spreadsheet, create_draft, mark_lead_texted
 from gmail_auth import get_gmail_credentials
 import ghl_sync
+import health_alert
 
 # To Auto run - crontab -e - remove the hash infront of * * * * * cd /opt/quote_engine && /opt/quote_engine/venv/bin/python autoemailing.py >> /opt/quote_engine/automation.log 2>&1
 
@@ -30,6 +31,11 @@ import ghl_sync
 
 # Enable logging to capture any issues
 SEND_EMAILS = True  # ← set to True when ready to send
+
+# Each lead costs Google Sheets reads (60 a minute allowed). A large backlog
+# (e.g. a weekday's leads waiting for the evening start) is worked through
+# this many per run; the rest keep their Automations label for the next run.
+MAX_LEADS_PER_RUN = int(os.getenv("MAX_LEADS_PER_RUN", "20"))
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -239,8 +245,7 @@ def decode_base64(data):
 def run_automation():
     creds = authenticate_gmail()
     if not creds:
-        logging.error("Failed to authenticate with Gmail.")
-        return
+        raise RuntimeError("Failed to authenticate with Gmail.")
 
     service = build('gmail', 'v1', credentials=creds, cache_discovery=False)
     logging.debug("Gmail service created successfully.")
@@ -259,8 +264,7 @@ def run_automation():
     phx_label_id = label_ids.get('PHX')
 
     if not lead_label_id:
-        logging.error("Automations label not found.")
-        return
+        raise RuntimeError("Automations label not found.")
 
     # ---- Fetch Emails ----
     # emails, dfw_emails = fetch_emails(
@@ -301,6 +305,10 @@ def run_automation():
         for msg in email_list:
             if 'body' not in msg:
                 continue
+            if len(processed_message_ids) + len(skipped_message_ids) >= MAX_LEADS_PER_RUN:
+                logging.info("Lead cap of %d reached; the rest wait for the next run.",
+                             MAX_LEADS_PER_RUN)
+                return
 
             try:
                 lead = parse_email_details(
@@ -660,5 +668,10 @@ def get_label_id(service, label_name):
 from warmup import preload_all
 
 if __name__ == "__main__":
-    preload_all()
-    run_automation()
+    try:
+        preload_all()
+        run_automation()
+    except Exception as e:
+        health_alert.record_failure(e)
+        raise
+    health_alert.record_success()

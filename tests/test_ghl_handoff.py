@@ -770,7 +770,7 @@ class LeadSheetMarking(Base):
 
 class TrackingCodes(unittest.TestCase):
     OLD_FORM = """Jones, Joel wants monthly cleaning!
-Phone: 3609038004
+Phone: 5035550142
 email: test@test.com
 Address: 97034
 SQFT: 2000
@@ -780,10 +780,10 @@ UTM CODES ( COPY INTO A1 SHEET):
 CAMPAIGN : 119396
 SOURCE : google
 """
-    # As read from the real Phoenix test lead (plain-text part).
+    # Same layout as the real Phoenix test lead (plain-text part).
     NEW_FORM = """Test, Test wants biWeekly cleaning!
-Phone: 3609038004
-email: drinkh20bois@gmail.com
+Phone: 5035550142
+email: test.lead@example.com
 Address: 85205
 SQFT: 2300
 Bed 2

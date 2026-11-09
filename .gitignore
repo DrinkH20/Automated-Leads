@@ -25,3 +25,7 @@ geocode_cache.json
 
 # GHL handoff ledger (retry state + held-for-review list)
 ghl_ledger.sqlite3
+
+# Run-health state for failure alerts
+health_state.json
+health_state.json.tmp

@@ -57,7 +57,7 @@ def load_scripts(market):
     result = sheet.values().get(
         spreadsheetId=SHEET_ID,
         range=market
-    ).execute()
+    ).execute(num_retries=5)
 
     values = result.get("values", [])
 
@@ -112,7 +112,7 @@ def load_auto_text_scripts():
     values = service.spreadsheets().values().get(
         spreadsheetId=SHEET_ID,
         range=f"'{AUTO_TEXT_TAB}'"
-    ).execute().get("values", [])
+    ).execute(num_retries=5).get("values", [])
 
     if not values:
         return AUTO_TEXT_CACHE
