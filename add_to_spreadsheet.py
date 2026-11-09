@@ -569,7 +569,8 @@ def mark_lead_texted(quote):
         os.path.join(BASE_DIR, "credentials", "google_secrets.json"),
         scopes=["https://www.googleapis.com/auth/spreadsheets"]
     )
-    sheet = gspread.authorize(creds).open_by_key(LEAD_SHEET_ID).worksheet(quote["market"].upper())
+    client = gspread.authorize(creds, http_client=gspread.http_client.BackOffHTTPClient)
+    sheet = client.open_by_key(LEAD_SHEET_ID).worksheet(quote["market"].upper())
 
     email = (quote.get("email") or "").strip().lower()
     emails = sheet.col_values(EMAIL_COL)
@@ -602,7 +603,8 @@ def add_to_spreadsheet(raw_data, mrkt, dfw_amount, pdx_prices, dfw_prices):
         ]
     )
 
-    client = gspread.authorize(creds)
+    # Wait and retry when Google's per-minute Sheets quota is hit (429).
+    client = gspread.authorize(creds, http_client=gspread.http_client.BackOffHTTPClient)
 
     spreadsheet_id = LEAD_SHEET_ID
     sheet_name = 'Sheet1'

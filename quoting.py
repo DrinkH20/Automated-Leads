@@ -197,10 +197,12 @@ def safe_update(sheet, range_name, values, retries=5):
             sheet.update(range_name, values)
             return
         except APIError as e:
-            if "429" in str(e):
+            if "429" in str(e) and i < retries - 1:
                 time.sleep(2 ** i)
             else:
                 raise
+    # Never fall through: the caller would read the previous lead's prices
+    # and email them as this lead's quote.
 
 ESTIMATOR_LOCK_PATH = os.getenv("ESTIMATOR_LOCK_PATH", "/tmp/quote_engine_estimator.lock")
 
@@ -269,7 +271,10 @@ def _batch_get_quotes(market, quotes_list):
         creds_file, scope
     )
 
-    client = gspread.authorize(creds)
+    # Google allows 60 Sheets reads a minute. A big batch of leads used to hit
+    # that, crash the run, and retry the same batch every minute forever.
+    # BackOffHTTPClient waits and retries on 429 instead (up to ~4 minutes).
+    client = gspread.authorize(creds, http_client=gspread.http_client.BackOffHTTPClient)
     sheet = client.open_by_key(MARKET_SHEETS[market]).worksheet("Estimator")
 
     results = []

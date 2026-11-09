@@ -45,7 +45,8 @@ def get_sheet(market):
 def initialize_client():
     """Initializes the Google Sheets client using service account credentials."""
     creds = Credentials.from_service_account_file(CREDENTIALS_FILE, scopes=SCOPES)
-    client = gspread.authorize(creds)
+    # Wait and retry when Google's per-minute Sheets quota is hit (429).
+    client = gspread.authorize(creds, http_client=gspread.http_client.BackOffHTTPClient)
     return client
 
 
