@@ -20,7 +20,7 @@ from gspread.exceptions import APIError  # noqa: E402
 import health_alert  # noqa: E402
 import quoting  # noqa: E402
 
-ALERT_ENV = {"ALERT_PHONE": "360-903-8004", "ALERT_MARKET": "PDX",
+ALERT_ENV = {"ALERT_PHONE": "503-555-0142", "ALERT_MARKET": "PDX",
              "ALERT_AFTER_FAILURES": "5", "ALERT_REMIND_HOURS": "6",
              "GHL_PDX_LOCATION_ID": "loc_pdx", "GHL_PDX_TOKEN": "tok"}
 
@@ -35,7 +35,7 @@ class Alerts(unittest.TestCase):
             mock.patch.dict(os.environ, ALERT_ENV),
             mock.patch.object(health_alert, "_now", lambda: self.now),
             mock.patch.object(health_alert.ghl_sync.GHLClient, "find_contact",
-                              lambda c, email, phone: "joel" if phone == "+13609038004" else None),
+                              lambda c, email, phone: "joel" if phone == "+15035550142" else None),
             mock.patch.object(health_alert.ghl_sync.GHLClient, "send_sms",
                               lambda c, cid, msg: self.sent.append((c.market, cid, msg))),
         ]
