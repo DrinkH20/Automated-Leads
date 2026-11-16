@@ -119,9 +119,15 @@ class FakeGHL:
                 {"id": f"{loc}_opp_whos", "fieldKey": "opportunity.whos_reaching_out"},
                 {"id": f"{loc}_opp_reached_out", "fieldKey": "opportunity.reached_out"}]}
         if path == "/opportunities/search":
+            # Search results use another shape (and can lag behind edits).
             assert method == "GET" and kw["params"]["location_id"] == loc
-            return {"opportunities": [o for o in self.opps.get(loc, [])
-                                      if o["contactId"] == kw["params"]["contact_id"]]}
+            return {"opportunities": [
+                {**o, "customFields": [{"id": f["id"], "fieldValueString": "stale?", "type": "string"}
+                                       for f in o["customFields"]]}
+                for o in self.opps.get(loc, []) if o["contactId"] == kw["params"]["contact_id"]]}
+        if path.startswith("/opportunities/") and method == "GET":
+            opp = next(o for o in self.opps[loc] if o["id"] == path.split("/")[2])
+            return {"opportunity": opp}  # like GHL: [{"id", "fieldValue"}]
         if path.startswith("/opportunities/") and method == "PUT":
             opp = next(o for o in self.opps[loc] if o["id"] == path.split("/")[2])
             for f in kw["json"]["customFields"]:

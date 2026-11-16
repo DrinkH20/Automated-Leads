@@ -413,14 +413,18 @@ class GHLClient:
         happened: "set", "unchanged", "kept" (a person's note is there), or
         "no opportunity".
         """
-        opp = self.latest_opportunity(contact_id)
-        if not opp:
+        newest = self.latest_opportunity(contact_id)
+        if not newest:
             return "no opportunity"
+        # Search results lag a few seconds behind edits; read the opportunity
+        # itself so a note someone just typed is seen.
+        opp = self._call("GET", f"/opportunities/{newest['id']}")["opportunity"]
         field_id = self.reached_out_field_id()
         current = ""
         for f in opp.get("customFields") or []:
             if f.get("id") == field_id:
-                current = str(f.get("fieldValue", f.get("value", f.get("fieldValueString"))) or "")
+                current = next((str(f[k]) for k in ("fieldValueString", "fieldValue", "value")
+                                if f.get(k) is not None), "")
         current = current.strip()
         if current.lower() == value:
             return "unchanged"
