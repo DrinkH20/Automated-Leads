@@ -178,6 +178,41 @@ class LeadCap(unittest.TestCase):
                 ae.run_automation()
 
 
+class MissingHouseDetails(unittest.TestCase):
+    """No sqft/bed/bath: no email, labelled AutomationSkipped, still on the sheet."""
+
+    def run_with(self, leads):
+        import autoemailing as ae
+        msgs = [{"id": f"m{i}", "body": str(i)} for i in range(len(leads))]
+        seen = {}
+        with mock.patch.object(ae, "authenticate_gmail", return_value=object()),                 mock.patch.object(ae, "build"),                 mock.patch.object(ae, "get_label_ids_by_name",
+                                  return_value={"Automations": "L1", "DFW": "L2", "PHX": "L3"}),                 mock.patch.object(ae, "fetch_emails", return_value=(msgs, [], [])),                 mock.patch.object(ae, "get_cleaned_body", side_effect=lambda b: b),                 mock.patch.object(ae, "parse_email_details", side_effect=lambda b, m: leads[int(b)]),                 mock.patch.object(ae, "add_to_spreadsheet", return_value=[]) as sheet,                 mock.patch.object(ae, "relabel_messages",
+                                  side_effect=lambda svc, ids, label: seen.setdefault(label, []).extend(ids)),                 mock.patch.object(ae.ghl_sync, "sync_quotes"):
+            ae.run_automation()
+        return seen, sheet.call_args[0][0]
+
+    @staticmethod
+    def lead(i, sqft="1500", bed="3", bath="2"):
+        return (f"Deeds, Amber{i}", "weekly", f"a{i}@example.com", sqft, bed, bath,
+                ("1", "Portland"), "5035551234", "", "")
+
+    def test_incomplete_lead_is_labelled_skipped_not_emailed(self):
+        leads = [self.lead(0), self.lead(1, bath=None), self.lead(2, sqft=""), self.lead(3, bed="n/a")]
+        seen, sheet_leads = self.run_with(leads)
+        self.assertEqual(seen["AutomatedEmailSent"], ["m0"])
+        self.assertEqual(seen["AutomationSkipped"], ["m1", "m2", "m3"])
+        self.assertEqual(len(sheet_leads), 4)  # all still go on the lead sheet
+
+    def test_sheet_row_only_says_emailed_when_a_quote_goes_out(self):
+        import add_to_spreadsheet as ats
+        complete = self.lead(0) + ("PDX",)
+        missing = self.lead(1, bath=None) + ("PDX",)
+        with mock.patch.object(ats, "batch_get_quotes", return_value=[{"output": {}}]),                 mock.patch.object(ats, "autocalc", return_value=("t", "b", {}, {"send_type": "weekly"})),                 mock.patch.object(ats, "build_text", return_value=(None, "test")),                 mock.patch.object(ats.ghl_sync, "build_quote", return_value=None):
+            rows, drafts, _ = ats.revise_list([complete, missing], "PDX", 0, {}, {})
+        self.assertEqual([r[4] for r in rows], ["emailed", ""])
+        self.assertEqual([d[2] for d in drafts], ["a0@example.com"])
+
+
 class SheetsQuota(unittest.TestCase):
     def test_estimator_client_waits_and_retries_on_429(self):
         with mock.patch("gspread.authorize") as auth, \
