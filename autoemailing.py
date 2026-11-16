@@ -448,6 +448,8 @@ def run_automation():
     for sub, body_text, receiver_email, lead_market, ghl_quote in draft_list:
 
         ghl_quotes.append(ghl_quote)
+        if ghl_quote:
+            ghl_quote["emailed"] = False  # set True below once the email is sent
 
         logging.info(f"Creating draft for {receiver_email}")
 
@@ -474,6 +476,8 @@ def run_automation():
                 ).execute()
 
                 sent_message_id = sent['id']
+                if ghl_quote:
+                    ghl_quote["emailed"] = True
 
                 labels_to_apply = ["Leads In Process", "AutomatedEmailSent"]
 

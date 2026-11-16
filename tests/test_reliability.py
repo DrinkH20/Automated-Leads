@@ -213,6 +213,30 @@ class MissingHouseDetails(unittest.TestCase):
         self.assertEqual([d[2] for d in drafts], ["a0@example.com"])
 
 
+class EmailedFlag(unittest.TestCase):
+    """The GHL quote says whether its email really went out (for "Reached out")."""
+
+    def run_with(self, create_draft):
+        import autoemailing as ae
+        quote = {"quote_id": "q1"}
+        lead = ("Lee, Ann", "weekly", "a@example.com", "1500", "3", "2",
+                ("1", "Portland"), "5035551234", "", "")
+        with mock.patch.object(ae, "authenticate_gmail", return_value=mock.MagicMock()),                 mock.patch.object(ae, "build", return_value=mock.MagicMock()),                 mock.patch.object(ae, "get_label_ids_by_name",
+                                  return_value={"Automations": "L1", "DFW": "L2", "PHX": "L3"}),                 mock.patch.object(ae, "fetch_emails", return_value=([{"id": "m0", "body": "x"}], [], [])),                 mock.patch.object(ae, "get_cleaned_body", side_effect=lambda b: b),                 mock.patch.object(ae, "parse_email_details", return_value=lead),                 mock.patch.object(ae, "add_to_spreadsheet",
+                                  return_value=[("sub", "body", "a@example.com", "PDX", quote)]),                 mock.patch.object(ae, "create_draft", side_effect=create_draft),                 mock.patch.object(ae, "relabel_messages"),                 mock.patch.object(ae, "SEND_EMAILS", True),                 mock.patch.object(ae.ghl_sync, "sync_quotes") as sync:
+            ae.run_automation()
+        self.assertEqual(sync.call_args[0][0], [quote])
+        return quote
+
+    def test_sent_email_is_flagged(self):
+        self.assertIs(self.run_with(lambda **kw: {"id": "d1"})["emailed"], True)
+
+    def test_failed_email_is_not(self):
+        def boom(**kw):
+            raise RuntimeError("Gmail down")
+        self.assertIs(self.run_with(boom)["emailed"], False)
+
+
 class SheetsQuota(unittest.TestCase):
     def test_estimator_client_waits_and_retries_on_429(self):
         with mock.patch("gspread.authorize") as auth, \

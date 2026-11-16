@@ -65,6 +65,23 @@ class FakeGHL:
         self.calls = []
         self.sms = []        # (location_id, contact_id, message, body)
         self.send_error = None  # exception to raise on the next send
+        self.opps = {}       # location_id -> [opportunity]
+
+    def add_opportunity(self, location_id, opp_id="o1", contact_id="c1",
+                        created="2026-11-16T10:00:00Z", reached_out=None):
+        fields = ([{"id": f"{location_id}_opp_reached_out", "fieldValue": reached_out}]
+                  if reached_out is not None else [])
+        opp = {"id": opp_id, "contactId": contact_id, "createdAt": created, "customFields": fields}
+        self.opps.setdefault(location_id, []).append(opp)
+        return opp
+
+    def reached_out(self, location_id, opp_id="o1"):
+        for o in self.opps.get(location_id, []):
+            if o["id"] == opp_id:
+                for f in o["customFields"]:
+                    if f["id"] == f"{location_id}_opp_reached_out":
+                        return f["fieldValue"]
+        return None
 
     def add_contact(self, location_id, contact_id="c1", email=EMAIL, phone=PHONE,
                     tags=("auto text",), dnd=False, updated="2026-10-28"):
@@ -97,6 +114,20 @@ class FakeGHL:
             assert body["type"] == "SMS"
             self.sms.append((loc, body["contactId"], body["message"], body))
             return {"messageId": f"m{len(self.sms)}", "conversationId": "conv"}
+        if path.endswith("/customFields") and kw["params"]["model"] == "opportunity":
+            return {"customFields": [
+                {"id": f"{loc}_opp_whos", "fieldKey": "opportunity.whos_reaching_out"},
+                {"id": f"{loc}_opp_reached_out", "fieldKey": "opportunity.reached_out"}]}
+        if path == "/opportunities/search":
+            assert method == "GET" and kw["params"]["location_id"] == loc
+            return {"opportunities": [o for o in self.opps.get(loc, [])
+                                      if o["contactId"] == kw["params"]["contact_id"]]}
+        if path.startswith("/opportunities/") and method == "PUT":
+            opp = next(o for o in self.opps[loc] if o["id"] == path.split("/")[2])
+            for f in kw["json"]["customFields"]:
+                opp["customFields"] = [x for x in opp["customFields"] if x["id"] != f["id"]]
+                opp["customFields"].append({"id": f["id"], "fieldValue": f["field_value"]})
+            return {}
         if path.endswith("/customFields"):
             return {"customFields": [{"id": f"{loc}_{k}", "fieldKey": f"contact.{k}"}
                                      for k in ghl_sync.QUOTE_FIELDS]}
@@ -240,6 +271,7 @@ class ServiceNames(unittest.TestCase):
 
 class BlockedTexts(Base):
     def assert_held_without_ghl(self, q, reason_part):
+        q["emailed"] = False  # an emailed lead's opportunity is still marked; see ReachedOut
         ghl_sync.sync_quotes([q])
         status, detail = self.status(q)
         self.assertEqual(status, "held")
@@ -286,7 +318,7 @@ class Consent(Base):
         # Order: save quote -> read back -> mark quote_id -> send -> tag
         steps = [c[2] + " " + c[3] for c in self.ghl.calls]
         send = steps.index("POST /conversations/messages")
-        puts = [i for i, s in enumerate(steps) if s.startswith("PUT")]
+        puts = [i for i, s in enumerate(steps) if s.startswith("PUT /contacts")]
         self.assertEqual(len(puts), 2)
         self.assertLess(puts[1], send)
         self.assertGreater(steps.index("POST /contacts/c1/tags"), send)
@@ -526,6 +558,76 @@ class OneTextPerLead(Base):
         self.ghl.add_contact("loc_dfw")
         ghl_sync.sync_quotes([self.quote()[1], self.quote(market="DFW")[1]])
         self.assertEqual(len(self.ghl.sms), 2)
+
+
+class ReachedOut(Base):
+    """The opportunity's "Reached out": emailed, then emailed/texted once texted."""
+
+    def setUp(self):
+        super().setUp()
+        self.ghl.add_contact("loc_pdx")
+        self.ghl.add_opportunity("loc_pdx", "old", created="2026-01-02T10:00:00Z")
+        self.ghl.add_opportunity("loc_pdx", "o1")
+
+    def test_night_lead_reads_emailed_then_emailed_texted_at_8am(self):
+        self.hours_open = False
+        _, q = self.quote()
+        q["emailed"] = True
+        ghl_sync.sync_quotes([q])
+        self.assertEqual(self.status(q)[0], "scheduled")
+        self.assertEqual(self.ghl.reached_out("loc_pdx"), "emailed")
+        self.hours_open = True
+        ghl_sync.sync_quotes([])
+        self.assertEqual(self.status(q)[0], "sent")
+        self.assertEqual(self.ghl.reached_out("loc_pdx"), "emailed/texted")
+        self.assertIsNone(self.ghl.reached_out("loc_pdx", "old"))  # only the newest opportunity
+
+    def test_no_consent_stays_emailed(self):
+        self.ghl.contact("loc_pdx")["tags"] = []
+        _, q = self.quote()
+        ghl_sync.sync_quotes([q])
+        self.assertEqual(self.ghl.reached_out("loc_pdx"), "emailed")
+
+    def test_email_that_failed_is_not_recorded_as_emailed(self):
+        self.ghl.contact("loc_pdx")["tags"] = []
+        _, q = self.quote()
+        q["emailed"] = False
+        ghl_sync.sync_quotes([q])
+        self.assertIsNone(self.ghl.reached_out("loc_pdx"))
+
+    def test_held_quote_still_marks_emailed_but_writes_nothing_else(self):
+        self.texting[("PDX", "BIWEEKLY")] = "   "
+        _, q = self.quote()
+        ghl_sync.sync_quotes([q])
+        self.assertEqual(self.status(q)[0], "held")
+        self.assertEqual(self.ghl.reached_out("loc_pdx"), "emailed")
+        self.assertEqual(self.ghl.contact("loc_pdx")["fields"], {})
+        self.assertEqual(self.ghl.sms, [])
+
+    def test_a_persons_note_is_never_overwritten(self):
+        self.ghl.opps["loc_pdx"][1]["customFields"] = [
+            {"id": "loc_pdx_opp_reached_out", "fieldValue": "spoke with"}]
+        _, q = self.quote()
+        ghl_sync.sync_quotes([q])
+        self.assertEqual(self.status(q)[0], "sent")
+        self.assertEqual(self.ghl.reached_out("loc_pdx"), "spoke with")
+
+    def test_no_opportunity_or_no_access_never_blocks_the_text(self):
+        self.ghl.opps.clear()
+        _, q = self.quote()
+        ghl_sync.sync_quotes([q])
+        self.assertEqual(self.status(q)[0], "sent")
+        real = self.ghl.__call__
+
+        def no_scope(client, method, path, headers=None, **kw):
+            if path.startswith("/opportunities"):
+                raise RuntimeError("GHL GET /opportunities/search -> 401: not authorized for this scope")
+            return real(client, method, path, headers, **kw)
+        self.ghl.add_contact("loc_pdx", "c2", email="bob@example.com", phone="+15035559999")
+        with mock.patch.object(ghl_sync.GHLClient, "_call", no_scope):
+            _, q2 = self.quote(email="bob@example.com", phone="503-555-9999")
+            ghl_sync.sync_quotes([q2])
+        self.assertEqual(self.status(q2)[0], "sent")
 
 
 class Modes(Base):
