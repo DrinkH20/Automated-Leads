@@ -12,7 +12,7 @@ import base64
 from email.mime.text import MIMEText
 import re
 from mapcodes import get_zone
-from add_to_spreadsheet import add_to_spreadsheet, create_draft, mark_lead_texted
+from add_to_spreadsheet import add_to_spreadsheet, create_draft, mark_lead_texted, has_house_details
 from gmail_auth import get_gmail_credentials
 import ghl_sync
 import health_alert
@@ -344,6 +344,17 @@ def run_automation():
                 # if in_zone <= 0 or beds <= 0:
                 #     continue
 
+                # A lead missing sqft/bed/bath can't be quoted, so no email goes
+                # out. It still goes on the lead sheet, but is labelled
+                # AutomationSkipped, not AutomatedEmailSent, so it's clear it
+                # needs a person.
+                if not has_house_details(sqft, bed, bath):
+                    logging.warning("No quote email for %s: missing sqft/bed/bath (%r/%r/%r); "
+                                    "labelled AutomationSkipped", email, sqft, bed, bath)
+                    all_leads.append(lead)
+                    skipped_message_ids.append(msg['id'])
+                    continue
+
                 # ---- Duplicate Handling ----
                 if email in seen_leads:
                     existing = seen_leads[email]
@@ -437,6 +448,8 @@ def run_automation():
     for sub, body_text, receiver_email, lead_market, ghl_quote in draft_list:
 
         ghl_quotes.append(ghl_quote)
+        if ghl_quote:
+            ghl_quote["emailed"] = False  # set True below once the email is sent
 
         logging.info(f"Creating draft for {receiver_email}")
 
@@ -463,6 +476,8 @@ def run_automation():
                 ).execute()
 
                 sent_message_id = sent['id']
+                if ghl_quote:
+                    ghl_quote["emailed"] = True
 
                 labels_to_apply = ["Leads In Process", "AutomatedEmailSent"]
 
@@ -493,14 +508,14 @@ def run_automation():
     ghl_sync.sync_quotes(ghl_quotes, on_sent=mark_lead_texted)
 
     # ---- Remove Label After Processing ----
-    # Emailed leads and out-of-zone leads both leave the queue; only the label
-    # they land on differs. Anything still carrying Automations after this
+    # Emailed leads, out-of-zone leads and leads missing house details all
+    # leave the queue; only the label they land on differs. Anything still carrying Automations after this
     # failed unexpectedly and gets retried on the next run.
     relabel_messages(service, processed_message_ids, "AutomatedEmailSent")
     relabel_messages(service, skipped_message_ids, "AutomationSkipped")
 
     logging.info(
-        "Automation run complete. %d emailed, %d skipped as out of zone.",
+        "Automation run complete. %d emailed, %d skipped (out of zone or missing house details).",
         len(processed_message_ids), len(skipped_message_ids)
     )
 

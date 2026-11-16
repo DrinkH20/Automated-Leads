@@ -45,6 +45,11 @@ def _to_number(value):
         return None
 
 
+def has_house_details(sqft, bed, bath):
+    """True if the lead gave a usable sqft, bed and bath count -- needed to quote."""
+    return None not in (_to_number(sqft), _to_number(bed), _to_number(bath))
+
+
 def safe_state_place(sp):
     """Return (zone, city) from state_place, safely."""
     zone, city = "", ""
@@ -196,9 +201,11 @@ def revise_list(data, mark, dfw_count, pdx_pricing, dfw_pricing):
             stype_idx = 0
 
         markets_for_rows.append(market)  # ✅ add this
-        # Add to sheet data
+        # Add to sheet data. A lead missing sqft/bed/bath gets no quote email
+        # (see below), so its status cell stays blank rather than "emailed".
+        status = "emailed" if has_house_details(sqft, bed, bath) else ""
         revised_data.append((
-            today_date, source_value, "Auto", "", "emailed",  # B = source code
+            today_date, source_value, "Auto", "", status,  # B = source code
             "", "", "", "", "",
             name, service_type, zone, email, phone, "",
             campaign_value, city  # Q = campaign code

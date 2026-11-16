@@ -32,6 +32,13 @@ Per quote:
   5. Mark the attempt (ledger 'sending', contact quote_id), send the text,
      then tag the contact QUOTE_TEXTED_TAG and record 'sent'.
 
+The lead's opportunity has a "Reached out" field (opportunity.reached_out)
+saying how the lead was contacted: "emailed" once the quote email has gone out,
+then "emailed/texted" when the text goes out -- e.g. a lead from 10pm reads
+"emailed" overnight and "emailed/texted" after the 8am batch. Only a blank
+field, or one this code wrote, is changed: anything a person typed there
+("spoke with", ...) is left alone. Updating it never blocks or undoes a text.
+
 Never texting twice wins over never missing a text: if a run dies, or the
 send times out, after step 5 began, the quote is NOT resent. It stays
 'sending' / is held as "send outcome unknown" for someone to check the
@@ -53,7 +60,8 @@ Optional:    GHL_<MKT>_FROM_NUMBER (+1...) to pick the sending number;
                18:00: Mon-Fri, new quotes text from then until 19:30.
              Quotes from after 19:30 (or before 08:00) go out at 08:00 the
              next morning, any day -- cron must run then (send_queued_texts.py).
-Token scopes: contacts read/write, custom fields read, conversations/message.write
+Token scopes: contacts read/write, custom fields read, conversations/message.write,
+              opportunities read/write
 """
 
 import hashlib
@@ -74,6 +82,8 @@ MESSAGES_API_VERSION = "2021-04-15"
 TIMEOUT = 20
 
 QUOTE_TEXTED_TAG = "quote-texted"
+REACHED_OUT_FIELD = "reached_out"   # opportunity field "Reached out": emailed / emailed/texted
+REACHED_OUT_STEPS = ("", "emailed", "texted", "emailed/texted")  # values this code may replace
 CONSENT_TAG = os.getenv("GHL_CONSENT_TAG", "auto text").strip().lower()
 MAX_ATTEMPTS = 5
 CONSENT_WAIT_MINUTES = int(os.getenv("GHL_CONSENT_WAIT_MINUTES", "30"))
@@ -382,6 +392,50 @@ class GHLClient:
     def set_field(self, contact_id, key, value):
         self.update_contact(contact_id, {"customFields": [{"id": self.field_ids()[key], "field_value": value}]})
 
+    def reached_out_field_id(self):
+        data = self._call("GET", f"/locations/{self.location_id}/customFields",
+                          params={"model": "opportunity"})
+        for f in data.get("customFields", []):
+            if (f.get("fieldKey") or "") == f"opportunity.{REACHED_OUT_FIELD}":
+                return f["id"]
+        raise RuntimeError(f"{self.market} sub-account has no opportunity field '{REACHED_OUT_FIELD}'")
+
+    def latest_opportunity(self, contact_id):
+        data = self._call("GET", "/opportunities/search",
+                          params={"location_id": self.location_id, "contact_id": contact_id})
+        opps = data.get("opportunities") or []
+        opps.sort(key=lambda o: o.get("createdAt") or o.get("dateAdded") or "", reverse=True)
+        return opps[0] if opps else None
+
+    def set_reached_out(self, contact_id, value):
+        """
+        Write "Reached out" on the contact's newest opportunity. Returns what
+        happened: "set", "unchanged", "kept" (a person's note is there), or
+        "no opportunity".
+        """
+        newest = self.latest_opportunity(contact_id)
+        if not newest:
+            return "no opportunity"
+        # Search results lag a few seconds behind edits; read the opportunity
+        # itself so a note someone just typed is seen.
+        opp = self._call("GET", f"/opportunities/{newest['id']}")["opportunity"]
+        field_id = self.reached_out_field_id()
+        current = ""
+        for f in opp.get("customFields") or []:
+            if f.get("id") == field_id:
+                current = next((str(f[k]) for k in ("fieldValueString", "fieldValue", "value")
+                                if f.get(k) is not None), "")
+        current = current.strip()
+        if current.lower() == value:
+            return "unchanged"
+        if current.lower() not in REACHED_OUT_STEPS:
+            return "kept"
+        if current.lower() == "emailed/texted":
+            return "unchanged"  # never step back down to "emailed"
+        self._call("PUT", f"/opportunities/{opp['id']}",
+                   json={"customFields": [{"id": field_id, "field_value": value}]})
+        return "set"
+
     def add_tags(self, contact_id, tags):
         self._call("POST", f"/contacts/{contact_id}/tags", json={"tags": tags})
 
@@ -438,12 +492,37 @@ def _wait_or_hold(conn, quote, reason, contact_id=None):
     return "held"
 
 
+def _emailed(quote):
+    """Did this quote's email go out? (Quotes queued before this flag existed were.)"""
+    return quote.get("emailed", True)
+
+
+def _reached_out(client, quote, contact_id, value):
+    """Update the opportunity's "Reached out"; problems are logged, never raised."""
+    try:
+        result = client.set_reached_out(contact_id, value)
+        if result != "set":
+            logging.info("Reached out not set to %r for %s (%s): %s",
+                         value, quote["email"], quote["market"], result)
+    except Exception as e:
+        logging.error("Could not set Reached out=%r for %s (%s): %s",
+                      value, quote["email"], quote["market"], e)
+
+
 def _hand_off(conn, quote, run_mode):
     if quote["problems"]:
         reason = "; ".join(quote["problems"])
         _record(conn, quote, "held", reason)
         logging.warning("TEXT HELD FOR REVIEW: %s (%s): %s",
                         quote["email"], quote["market"], reason)
+        if _emailed(quote):
+            try:
+                client = GHLClient(quote["market"])
+                contact_id = client.find_contact(quote["email"], quote["phone"])
+                if contact_id:
+                    _reached_out(client, quote, contact_id, "emailed")
+            except Exception as e:
+                logging.error("Could not mark %s 'emailed' in GHL: %s", quote["email"], e)
         return "held"
 
     client = GHLClient(quote["market"])
@@ -474,6 +553,9 @@ def _hand_off(conn, quote, run_mode):
     mismatched = [k for k in VERIFIED_FIELDS if not _same(saved.get(k), quote["fields"][k])]
     if mismatched:
         raise RuntimeError(f"fields did not save correctly: {mismatched}")
+
+    if _emailed(quote):
+        _reached_out(client, quote, contact_id, "emailed")
 
     consented = CONSENT_TAG in _tags(contact)
     blocked = _sms_blocked(contact)
@@ -529,6 +611,7 @@ def _hand_off(conn, quote, run_mode):
         client.add_tags(contact_id, [QUOTE_TEXTED_TAG])
     except Exception as e:
         logging.error("Text sent to %s but tagging failed: %s", quote["email"], e)
+    _reached_out(client, quote, contact_id, "emailed/texted" if _emailed(quote) else "texted")
     return "sent"
 
 
