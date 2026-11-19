@@ -190,10 +190,10 @@ def link_for(email):
 def button_html(url):
     url = html.escape(url, quote=True)
     return (
-        '<table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:18px 0;"><tr>'
+        '<table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:4px 0;"><tr>'
         f'<td align="center" bgcolor="{BUTTON_COLOR}" style="border-radius:6px;">'
-        f'<a href="{url}" target="_blank" style="display:inline-block;padding:14px 28px;'
-        'font-family:Arial,sans-serif;font-size:16px;font-weight:bold;color:#ffffff;'
+        f'<a href="{url}" target="_blank" style="display:inline-block;padding:9px 18px;'
+        'font-family:Arial,sans-serif;font-size:14px;font-weight:bold;color:#ffffff;'
         f'text-decoration:none;border-radius:6px;">{BUTTON_TEXT}</a>'
         '</td></tr></table>'
     )
