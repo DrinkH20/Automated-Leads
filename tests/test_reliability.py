@@ -237,6 +237,17 @@ class EmailedFlag(unittest.TestCase):
         self.assertIs(self.run_with(boom)["emailed"], False)
 
 
+class ScriptColumns(unittest.TestCase):
+    def test_a_second_script_column_never_replaces_the_live_one(self):
+        import script_loader as sl
+        values = [["key", "type", "script", "title", "texting", "script"],
+                  ["quote_text", "WEEKLY", "LIVE {name}", "T", "", "DRAFT {name}"]]
+        service = mock.MagicMock()
+        service.spreadsheets().values().get().execute.return_value = {"values": values}
+        with mock.patch.object(sl, "build", return_value=service),                 mock.patch.object(sl.Credentials, "from_service_account_file"),                 mock.patch.dict(sl.SCRIPT_CACHE, clear=True):
+            self.assertEqual(sl.get_email_script("quote_text", "PHX", "weekly"), "LIVE {name}")
+
+
 class SheetsQuota(unittest.TestCase):
     def test_estimator_client_waits_and_retries_on_429(self):
         with mock.patch("gspread.authorize") as auth, \
