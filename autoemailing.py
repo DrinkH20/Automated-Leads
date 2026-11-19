@@ -16,6 +16,7 @@ from add_to_spreadsheet import add_to_spreadsheet, create_draft, mark_lead_texte
 from gmail_auth import get_gmail_credentials
 import ghl_sync
 import health_alert
+import booking
 
 # To Auto run - crontab -e - remove the hash infront of * * * * * cd /opt/quote_engine && /opt/quote_engine/venv/bin/python autoemailing.py >> /opt/quote_engine/automation.log 2>&1
 
@@ -187,7 +188,8 @@ def fetch_emails(service, label_id, dfw_label_id=None, phx_label_id=None):
                     phx_emails.append({
                         'subject': subject,
                         'body': body,
-                        'id': message['id']
+                        'id': message['id'],
+                        'received': int(msg.get('internalDate', 0)) / 1000 or None,
                     })
 
                     continue
@@ -200,7 +202,8 @@ def fetch_emails(service, label_id, dfw_label_id=None, phx_label_id=None):
                     dfw_emails.append({
                         'subject': subject,
                         'body': body,
-                        'id': message['id']
+                        'id': message['id'],
+                        'received': int(msg.get('internalDate', 0)) / 1000 or None,
                     })
 
                     continue
@@ -211,7 +214,8 @@ def fetch_emails(service, label_id, dfw_label_id=None, phx_label_id=None):
                 pdx_emails.append({
                     'subject': subject,
                     'body': body,
-                    'id': message['id']
+                    'id': message['id'],
+                    'received': int(msg.get('internalDate', 0)) / 1000 or None,
                 })
 
             if not page_token:
@@ -249,6 +253,7 @@ def run_automation():
 
     service = build('gmail', 'v1', credentials=creds, cache_discovery=False)
     logging.debug("Gmail service created successfully.")
+    booking.reset()
 
     # ---- Get Label IDs ----
     # label_ids = get_label_ids_by_name(service, ['LeadsNotYetContacted', 'DFW'])
@@ -353,6 +358,13 @@ def run_automation():
                                     "labelled AutomationSkipped", email, sqft, bed, bath)
                     all_leads.append(lead)
                     skipped_message_ids.append(msg['id'])
+                    continue
+
+                # PHX: the email waits (up to BOOKING_WAIT_MINUTES from when the
+                # lead arrived) for Jobber to create the client, so it can carry
+                # a booking link. A waiting lead isn't marked processed: it keeps
+                # its Automations label and is picked up again next run.
+                if booking.prepare(email, market, msg.get('received')) == "wait":
                     continue
 
                 # ---- Duplicate Handling ----

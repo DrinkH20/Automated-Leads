@@ -17,6 +17,7 @@ import unicodedata
 from quoting import batch_get_quotes
 from script_loader import get_email_script, get_text_script, get_title
 import ghl_sync
+import booking
 from gmail_auth import get_gmail_credentials
 
 # ot, initial, move, monthly, biweekly, weekly = 0,0,0,0,0,0
@@ -339,7 +340,8 @@ def revise_list(data, mark, dfw_count, pdx_pricing, dfw_pricing):
                 username,
                 city,
                 market,
-                pricing  # ← if your autocalc needs the pricing array
+                pricing,  # ← if your autocalc needs the pricing array
+                email=email,
             )
             # Building the text must never cost the lead their email.
             try:
@@ -464,8 +466,8 @@ def create_draft(service, sender_name, sender, subject, message_text, receiver, 
             <table width="206" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;border-spacing:0px;color:rgb(20,49,65);font-family:proxima-nova,sans-serif;font-size:16px"><tbody><tr><td style="margin:auto;padding:0px 0px 1px"><a href="https://cleanaffinity.com/" style="background-color:transparent;color:rgb(35,82,124);outline:0px;display:inline-block" target="_blank"><img width="200" src="https://s1g.s3.amazonaws.com/325e6b8720f2f9a00d074326edf01a9f.png" style="border:none;vertical-align:baseline"></a></td></tr><tr><td height="4" style="padding:0px;border-top:3px solid rgb(0,0,0)"></td></tr><tr><td style="padding:0px;vertical-align:middle;color:rgb(0,0,0);font-size:12px;font-family:helvetica,arial"><span style="font-weight:700"><span style="font-size:15px">Office Team</span></span><br><br><table cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;border-spacing:0px;background-color:transparent;margin:0px 1px 1px 0px"><tbody><tr><td style="padding:0px 1px 0px 0px"><img width="33" height="33" src="https://s1g.s3.amazonaws.com/3e17acc3e1f17ca0eb066f92112030d4.png" alt="email" style="border:none;vertical-align:baseline"></td><td style="padding:0px"><span style="font-size-adjust:none;font-stretch:normal;line-height:normal"><a href="mailto:hellophx@cleanaffinity.com" style="background-color:transparent;color:rgb(0,0,0)" target="_blank">hellophx@cleanaffinity.com</a></span></td></tr></tbody></table><table cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;border-spacing:0px;background-color:transparent;margin:0px 1px 1px 0px"><tbody><tr><td style="padding:0px 1px 0px 0px"><img width="33" height="33" src="https://s1g.s3.amazonaws.com/6d17a9904ea926bfe5700c3e877f70c0.png" alt="mobile" style="border:none;vertical-align:baseline"></td><td style="padding:0px"><span style="font-size-adjust:none;font-stretch:normal;line-height:normal"><a href="tel:480-428-8450" target="_blank">480-428-8450</a></span></td></tr></tbody></table><table cellpadding="0" border="0" style="border-collapse:collapse;border-spacing:0px;background-color:transparent"><tbody><tr><td style="padding:0px 5px 0px 0px"><a href="https://facebook.com/cleanaffinity/" style="background-color:transparent;color:rgb(51,122,183);display:inline-block" target="_blank"><img width="33" height="33" src="https://s1g.s3.amazonaws.com/2c5fe92c2cad30bc7beafa503141662b.png" alt="Facebook" style="border:none;vertical-align:baseline"></a></td><td style="padding:0px 5px 0px 0px"><a href="https://instagram.com/cleanaffinity/" style="background-color:transparent;color:rgb(51,122,183);display:inline-block" target="_blank"><img width="33" height="33" src="https://s1g.s3.amazonaws.com/85231364dae3871f3e2465f0e3e47239.png" alt="Instagram" style="border:none;vertical-align:baseline"></a></td></tr></tbody></table><a href="https://cleanaffinity.com/home-cleaning-services-dallas/" style="background-color:transparent;color:rgb(0,0,0)" target="_blank">cleanaffinity.com/</a><br></td></tr></tbody></table>
             """
 
-        html_message = convert_text_to_html(message_text) + footer_html
-        plain_text = message_text + "\n\nBest regards,\nClean Affinity\n503-933-1917\nwww.cleanaffinity.com"
+        html_message = booking.render_html(convert_text_to_html(message_text), receiver) + footer_html
+        plain_text = booking.render_text(message_text, receiver) + "\n\nBest regards,\nClean Affinity\n503-933-1917\nwww.cleanaffinity.com"
 
         message.attach(MIMEText(plain_text, 'plain'))
         message.attach(MIMEText(html_message, 'html'))
@@ -735,16 +737,21 @@ def build_text(market, send_type, fill):
     if not template.strip():
         return None, f"texting cell is empty for {market} {send_type}"
     try:
-        return template.format(**fill).strip(), None
+        # {booking_link} is for emails only; in a text it's an unknown placeholder.
+        return template.format(**{k: v for k, v in fill.items() if k != "booking_link"}).strip(), None
     except KeyError as e:
         return None, f"unknown placeholder {{{e.args[0]}}} in {market} {send_type} texting wording"
     except (IndexError, ValueError) as e:
         return None, f"{market} {send_type} texting wording could not be filled: {e}"
 
 
-def autocalc(sqft, beds, baths, type_clean_numerical, name_first, name_last, username, city, market, pricing):
+def autocalc(sqft, beds, baths, type_clean_numerical, name_first, name_last, username, city, market, pricing,
+             email=None):
     fill, meta = quote_values(sqft, beds, baths, type_clean_numerical,
                               name_first, name_last, username, pricing)
+    # Always present, so a script using it can never fail to fill: the PHX
+    # booking button when this lead got a link, otherwise blank.
+    fill["booking_link"] = booking.placeholder(email)
 
     title_template = get_title("quote_text", market, meta["send_type"])
     body_template = get_email_script("quote_text", market, meta["send_type"])
