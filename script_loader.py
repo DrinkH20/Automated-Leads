@@ -1,5 +1,6 @@
 from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
+import logging
 import os, sys
 
 SHEET_ID = "1el4xvVhOMuUak0tfu-EVGoKHmjM8nkpa5w2gqhYuS3M"
@@ -68,11 +69,17 @@ def load_scripts(market):
     headers = [h.strip().lower() for h in values[0]]
     scripts = {}
 
+    dupes = sorted({h for h in headers if h and headers.count(h) > 1})
+    if dupes:
+        logging.warning("%s scripts tab has more than one %s column; using the first (leftmost)",
+                        market, ", ".join(repr(h) for h in dupes))
+
     for row in values[1:]:
-        row_dict = {
-            headers[i]: row[i] if i < len(row) else ""
-            for i in range(len(headers))
-        }
+        # If a header appears twice (e.g. a draft "script" column next to the
+        # live one), the leftmost column wins, so a draft can't go live by accident.
+        row_dict = {}
+        for i, h in enumerate(headers):
+            row_dict.setdefault(h, row[i] if i < len(row) else "")
 
         key_tuple = (
             row_dict["key"].strip().lower(),
