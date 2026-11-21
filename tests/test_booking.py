@@ -158,18 +158,18 @@ class Prepare(Base):
 
 
 class Rendering(Base):
-    def test_button_replaces_its_own_line_and_plain_text_gets_the_link(self):
+    def test_marker_becomes_a_left_aligned_link_and_plain_text_gets_the_url(self):
         import add_to_spreadsheet as ats
         self.svc.add_client(1, "ann@example.com")
         self.prepare()
         text = f"Hi Ann!\nPick a time:\n{booking.MARKER}\nThanks"
         out = booking.render_html(ats.convert_text_to_html(text), "ann@example.com")
         self.assertIn(f'href="{LINK}&amp;c=1"', out)
-        self.assertIn("Book your cleaning</a>", out)
+        self.assertIn("Click Here to Book</a></p>", out)
         self.assertNotIn(booking.MARKER, out)
-        self.assertNotIn("<p><table", out)
+        self.assertNotIn("<table", out)
         self.assertEqual(booking.render_text(text, "ann@example.com"),
-                         f"Hi Ann!\nPick a time:\nBook your cleaning: {LINK}&c=1\nThanks")
+                         f"Hi Ann!\nPick a time:\nClick Here to Book: {LINK}&c=1\nThanks")
 
     def test_no_link_leaves_no_trace(self):
         text = f"Hi\n{booking.MARKER}\nBye"
@@ -216,7 +216,7 @@ class Scripts(Base):
         self.assertIsNone(text)
         self.assertIn("unknown placeholder {booking_link}", problem)
 
-    def test_sent_email_carries_the_button(self):
+    def test_sent_email_carries_the_link(self):
         self.svc.add_client(1, "ann@example.com")
         self.prepare()
         service = mock.MagicMock()
@@ -227,7 +227,7 @@ class Scripts(Base):
         parts = {p.get_content_type(): p.get_payload(decode=True).decode() for p in msg.walk()
                  if not p.is_multipart()}
         self.assertIn(f'href="{LINK}&amp;c=1"', parts["text/html"])
-        self.assertIn(f"Book your cleaning: {LINK}&c=1", parts["text/plain"])
+        self.assertIn(f"Click Here to Book: {LINK}&c=1", parts["text/plain"])
         self.assertNotIn(booking.MARKER, parts["text/html"] + parts["text/plain"])
 
 

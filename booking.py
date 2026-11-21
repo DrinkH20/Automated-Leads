@@ -8,10 +8,11 @@ For each lead in a BOOKING_MARKETS market, before its quote email goes out:
      the lead is held back ("wait") and retried on the next runs.
   2. Ask the booking site for that client's personal link (POST
      /api/card/invite with the client ID and email; links last 7 days).
-  3. The scripts sheet's {booking_link} placeholder becomes a button with it.
+  3. The scripts sheet's {booking_link} placeholder becomes a "Click Here to Book"
+     link to it.
 
 If there's still no link after the wait (no Jobber client, Jobber or the
-booking site down, not configured), the email goes out without the button:
+booking site down, not configured), the email goes out without the link:
 {booking_link} is then blank. A lead never loses its quote email over this.
 Every other market's {booking_link} is always blank.
 
@@ -36,10 +37,10 @@ GRAPHQL_URL = "https://api.getjobber.com/api/graphql"
 TIMEOUT = 20
 
 # What {booking_link} becomes in the text of the email; create_draft swaps it
-# for the button (HTML) or the bare link (plain-text part).
+# for a "Click Here to Book" link (HTML) or the bare link (plain-text part).
 MARKER = "@@BOOKING_BUTTON@@"
-BUTTON_TEXT = "Book your cleaning"
-BUTTON_COLOR = "#1a7f5a"
+LINK_TEXT = "Click Here to Book"
+LINK_COLOR = "#0077d9"
 
 _links = {}       # email -> booking URL, for leads in this run that got one
 _decided = {}     # email -> "ready" | "none", so duplicates in a run agree
@@ -187,26 +188,22 @@ def link_for(email):
     return _links.get(_key(email))
 
 
-def button_html(url):
+def link_html(url):
+    """The booking link as ordinary left-aligned link text in the email."""
     url = html.escape(url, quote=True)
-    return (
-        '<table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:4px 0;"><tr>'
-        f'<td align="center" bgcolor="{BUTTON_COLOR}" style="border-radius:6px;">'
-        f'<a href="{url}" target="_blank" style="display:inline-block;padding:9px 18px;'
-        'font-family:Arial,sans-serif;font-size:14px;font-weight:bold;color:#ffffff;'
-        f'text-decoration:none;border-radius:6px;">{BUTTON_TEXT}</a>'
-        '</td></tr></table>'
-    )
+    return (f'<a href="{url}" target="_blank" style="color:{LINK_COLOR};'
+            f'font-weight:bold;text-decoration:underline;">{LINK_TEXT}</a>')
 
 
 def render_html(message_html, email):
-    """Swap the marker in the email's HTML for the button (or drop it)."""
+    """Swap the marker in the email's HTML for the link (or drop its line)."""
     if MARKER not in message_html:
         return message_html
     url = link_for(email)
-    button = button_html(url) if url else ""
-    message_html = message_html.replace(f"<p>{MARKER}</p>", button)
-    return message_html.replace(MARKER, button)
+    if not url:
+        message_html = message_html.replace(f"<p>{MARKER}</p>", "")
+        return message_html.replace(MARKER, "")
+    return message_html.replace(MARKER, link_html(url))
 
 
 def render_text(message_text, email):
@@ -214,4 +211,4 @@ def render_text(message_text, email):
     if MARKER not in message_text:
         return message_text
     url = link_for(email)
-    return message_text.replace(MARKER, f"{BUTTON_TEXT}: {url}" if url else "")
+    return message_text.replace(MARKER, f"{LINK_TEXT}: {url}" if url else "")

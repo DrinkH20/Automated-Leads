@@ -750,7 +750,7 @@ def autocalc(sqft, beds, baths, type_clean_numerical, name_first, name_last, use
     fill, meta = quote_values(sqft, beds, baths, type_clean_numerical,
                               name_first, name_last, username, pricing)
     # Always present, so a script using it can never fail to fill: the PHX
-    # booking button when this lead got a link, otherwise blank.
+    # "Click Here to Book" link when this lead got a link, otherwise blank.
     fill["booking_link"] = booking.placeholder(email)
 
     title_template = get_title("quote_text", market, meta["send_type"])
