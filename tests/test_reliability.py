@@ -245,7 +245,38 @@ class ScriptColumns(unittest.TestCase):
         service = mock.MagicMock()
         service.spreadsheets().values().get().execute.return_value = {"values": values}
         with mock.patch.object(sl, "build", return_value=service),                 mock.patch.object(sl.Credentials, "from_service_account_file"),                 mock.patch.dict(sl.SCRIPT_CACHE, clear=True):
-            self.assertEqual(sl.get_email_script("quote_text", "PHX", "weekly"), "LIVE {name}")
+            self.assertEqual(sl.get_email_script("quote_text", "DFW", "weekly"), "LIVE {name}")
+
+    def _load(self, values, market):
+        import script_loader as sl
+        service = mock.MagicMock()
+        service.spreadsheets().values().get().execute.return_value = {"values": values}
+        patches = [mock.patch.object(sl, "build", return_value=service),
+                   mock.patch.object(sl.Credentials, "from_service_account_file"),
+                   mock.patch.dict(sl.SCRIPT_CACHE, clear=True)]
+        for p in patches:
+            p.start()
+            self.addCleanup(p.stop)
+        return sl
+
+    def test_phx_emails_come_from_column_f_and_others_from_c(self):
+        values = [["key", "type", "script", "title", "texting", "auto emailing"],
+                  ["quote_text", "WEEKLY", "COLUMN C {name}", "T", "", "COLUMN F {name}"]]
+        sl = self._load(values, "PHX")
+        self.assertEqual(sl.get_email_script("quote_text", "PHX", "weekly"), "COLUMN F {name}")
+        self.assertEqual(sl.get_title("quote_text", "PHX", "weekly"), "T")
+        self.assertEqual(sl.get_email_script("quote_text", "DFW", "weekly"), "COLUMN C {name}")
+
+    def test_blank_or_missing_column_f_never_falls_back_to_column_c(self):
+        sl = self._load([["key", "type", "script", "title", "texting", "auto emailing"],
+                         ["quote_text", "WEEKLY", "COLUMN C", "T", "", "  "]], "PHX")
+        with self.assertRaises(ValueError):
+            sl.get_email_script("quote_text", "PHX", "weekly")
+        sl.SCRIPT_CACHE.clear()
+        sl = self._load([["key", "type", "script", "title", "texting"],
+                         ["quote_text", "WEEKLY", "COLUMN C", "T", ""]], "PHX")
+        with self.assertRaises(ValueError):
+            sl.get_email_script("quote_text", "PHX", "weekly")
 
 
 class SheetsQuota(unittest.TestCase):

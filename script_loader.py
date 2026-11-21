@@ -7,6 +7,11 @@ SHEET_ID = "1el4xvVhOMuUak0tfu-EVGoKHmjM8nkpa5w2gqhYuS3M"
 
 SCRIPT_CACHE = {}  # cache per market
 
+# Which column of a market's tab the quote EMAILS come from (header text,
+# lowercase). PHX emails use column F ("auto emailing"); PHX's column C is used for
+# other things. Every other market uses its "script" column.
+EMAIL_SCRIPT_COLUMNS = {"PHX": "auto emailing"}
+
 SCRIPT_KEYS = {
     "QUOTE": "quote_text",
     "OUT_OF_AREA": "out_of_area",
@@ -87,18 +92,22 @@ def load_scripts(market):
             row_dict["type"].strip().upper()
         )
 
-        scripts[key_tuple] = {
-            "script": row_dict.get("script", ""),
-            "title": row_dict.get("title", ""),
-            "texting": row_dict.get("texting", "")
-        }
+        entry = dict(row_dict)
+        for field in ("script", "title", "texting"):
+            entry.setdefault(field, "")
+        scripts[key_tuple] = entry
 
     SCRIPT_CACHE[market] = scripts
     return scripts
 
 
 def get_email_script(key, market, type_):
-    return get_script(key, market, type_, field="script")
+    column = EMAIL_SCRIPT_COLUMNS.get(market.upper(), "script")
+    text = get_script(key, market, type_, field=column)
+    if not text.strip():
+        # Never send an empty email, and never fall back to another column.
+        raise ValueError(f"The {market} '{column}' column is blank for key={key}, type={type_}")
+    return text
 
 
 # Auto-text wording lives on its own tab: one row per key/type, one column
