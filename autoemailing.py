@@ -38,6 +38,19 @@ SEND_EMAILS = True  # ← set to True when ready to send
 # this many per run; the rest keep their Automations label for the next run.
 MAX_LEADS_PER_RUN = int(os.getenv("MAX_LEADS_PER_RUN", "20"))
 
+
+def email_markets():
+    """
+    Which markets this run emails. runner.sh sets EMAIL_MARKETS=PHX outside
+    the evening/weekend window so PHX quotes go out around the clock; unset
+    means every market. Leads from the other markets are left untouched (they
+    keep their Automations label) for the next full run.
+    """
+    raw = os.getenv("EMAIL_MARKETS", "").strip()
+    if not raw:
+        return {"PDX", "DFW", "PHX"}
+    return {m.strip().upper() for m in raw.split(",") if m.strip()}
+
 logging.basicConfig(level=logging.DEBUG)
 
 # Nearly every line of the 866MB log this grew into was one of these libraries
@@ -389,9 +402,13 @@ def run_automation():
                 logging.error(f"Error processing lead: {e}")
 
     # ---- Process PDX then DFW ----
-    process_email_list(pdx_emails, "PDX")
-    process_email_list(dfw_emails, "DFW")
-    process_email_list(phx_emails, "PHX")
+    markets_now = email_markets()
+    for market_emails, market in ((pdx_emails, "PDX"), (dfw_emails, "DFW"), (phx_emails, "PHX")):
+        if market in markets_now:
+            process_email_list(market_emails, market)
+        elif market_emails:
+            logging.info("%d %s lead(s) left queued: this run only emails %s",
+                         len(market_emails), market, ", ".join(sorted(markets_now)))
 
     # process_email_list(emails, "PDX")
     # before_dfw_len = len(all_leads)
