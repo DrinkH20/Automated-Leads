@@ -1,10 +1,16 @@
 from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
+import logging
 import os, sys
 
 SHEET_ID = "1el4xvVhOMuUak0tfu-EVGoKHmjM8nkpa5w2gqhYuS3M"
 
 SCRIPT_CACHE = {}  # cache per market
+
+# Which column of a market's tab the quote EMAILS come from (header text,
+# lowercase). PHX emails use column F ("auto_emailing_booking"); PHX's column C is used for
+# other things. Every other market uses its "script" column.
+EMAIL_SCRIPT_COLUMNS = {"PHX": "auto_emailing_booking"}
 
 SCRIPT_KEYS = {
     "QUOTE": "quote_text",
@@ -68,11 +74,17 @@ def load_scripts(market):
     headers = [h.strip().lower() for h in values[0]]
     scripts = {}
 
+    dupes = sorted({h for h in headers if h and headers.count(h) > 1})
+    if dupes:
+        logging.warning("%s scripts tab has more than one %s column; using the first (leftmost)",
+                        market, ", ".join(repr(h) for h in dupes))
+
     for row in values[1:]:
-        row_dict = {
-            headers[i]: row[i] if i < len(row) else ""
-            for i in range(len(headers))
-        }
+        # If a header appears twice (e.g. a draft "script" column next to the
+        # live one), the leftmost column wins, so a draft can't go live by accident.
+        row_dict = {}
+        for i, h in enumerate(headers):
+            row_dict.setdefault(h, row[i] if i < len(row) else "")
 
         key_tuple = (
             row_dict["key"].strip().lower(),
@@ -80,18 +92,22 @@ def load_scripts(market):
             row_dict["type"].strip().upper()
         )
 
-        scripts[key_tuple] = {
-            "script": row_dict.get("script", ""),
-            "title": row_dict.get("title", ""),
-            "texting": row_dict.get("texting", "")
-        }
+        entry = dict(row_dict)
+        for field in ("script", "title", "texting"):
+            entry.setdefault(field, "")
+        scripts[key_tuple] = entry
 
     SCRIPT_CACHE[market] = scripts
     return scripts
 
 
 def get_email_script(key, market, type_):
-    return get_script(key, market, type_, field="script")
+    column = EMAIL_SCRIPT_COLUMNS.get(market.upper(), "script")
+    text = get_script(key, market, type_, field=column)
+    if not text.strip():
+        # Never send an empty email, and never fall back to another column.
+        raise ValueError(f"The {market} '{column}' column is blank for key={key}, type={type_}")
+    return text
 
 
 # Auto-text wording lives on its own tab: one row per key/type, one column
