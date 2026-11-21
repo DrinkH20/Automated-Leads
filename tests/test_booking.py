@@ -234,7 +234,7 @@ class Scripts(Base):
 class EmailRun(Base):
     """A PHX lead waiting for its Jobber client stays queued; nothing is emailed yet."""
 
-    def run_with(self, minutes_old):
+    def run_with(self, minutes_old, pdx_msgs=()):
         import autoemailing as ae
         msgs = [{"id": "m0", "body": "x", "received": time.time() - minutes_old * 60}]
         lead = ("Lee, Ann", "weekly", "ann@example.com", "1500", "3", "2",
@@ -244,7 +244,7 @@ class EmailRun(Base):
                 mock.patch.object(ae, "build", return_value=mock.MagicMock()), \
                 mock.patch.object(ae, "get_label_ids_by_name",
                                   return_value={"Automations": "L1", "DFW": "L2", "PHX": "L3"}), \
-                mock.patch.object(ae, "fetch_emails", return_value=([], [], msgs)), \
+                mock.patch.object(ae, "fetch_emails", return_value=(list(pdx_msgs), [], msgs)), \
                 mock.patch.object(ae, "get_cleaned_body", side_effect=lambda b: b), \
                 mock.patch.object(ae, "parse_email_details", return_value=lead), \
                 mock.patch.object(ae, "add_to_spreadsheet", return_value=[]) as sheet, \
@@ -269,6 +269,23 @@ class EmailRun(Base):
         seen, sheet_leads = self.run_with(minutes_old=1)
         self.assertEqual(seen["AutomatedEmailSent"], ["m0"])
         self.assertEqual(booking.link_for("ann@example.com"), LINK + "&c=1")
+
+
+    def test_phx_only_run_leaves_other_markets_queued(self):
+        self.svc.add_client(1, "ann@example.com")
+        pdx = [{"id": "p0", "body": "x", "received": time.time()}]
+        with mock.patch.dict(os.environ, {"EMAIL_MARKETS": "PHX"}):
+            seen, sheet_leads = self.run_with(minutes_old=1, pdx_msgs=pdx)
+        self.assertEqual(seen["AutomatedEmailSent"], ["m0"])  # PHX emailed
+        self.assertNotIn("p0", seen.get("AutomatedEmailSent", []) + seen.get("AutomationSkipped", []))
+        self.assertEqual([lead[-1] for lead in sheet_leads], ["PHX"])
+
+    def test_full_run_by_default_emails_every_market(self):
+        self.svc.add_client(1, "ann@example.com")
+        pdx = [{"id": "p0", "body": "x", "received": time.time()}]
+        with mock.patch.dict(os.environ, {"EMAIL_MARKETS": ""}):
+            seen, _ = self.run_with(minutes_old=1, pdx_msgs=pdx)
+        self.assertEqual(sorted(seen["AutomatedEmailSent"]), ["m0", "p0"])
 
 
 if __name__ == "__main__":
