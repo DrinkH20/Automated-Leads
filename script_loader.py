@@ -8,9 +8,9 @@ SHEET_ID = "1el4xvVhOMuUak0tfu-EVGoKHmjM8nkpa5w2gqhYuS3M"
 SCRIPT_CACHE = {}  # cache per market
 
 # Which column of a market's tab the quote EMAILS come from (header text,
-# lowercase). PHX emails use column F ("auto emailing"); PHX's column C is used for
+# lowercase). PHX emails use column F ("auto_emailing_booking"); PHX's column C is used for
 # other things. Every other market uses its "script" column.
-EMAIL_SCRIPT_COLUMNS = {"PHX": "auto emailing"}
+EMAIL_SCRIPT_COLUMNS = {"PHX": "auto_emailing_booking"}
 
 SCRIPT_KEYS = {
     "QUOTE": "quote_text",

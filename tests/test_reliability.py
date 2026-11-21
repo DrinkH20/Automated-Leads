@@ -260,7 +260,7 @@ class ScriptColumns(unittest.TestCase):
         return sl
 
     def test_phx_emails_come_from_column_f_and_others_from_c(self):
-        values = [["key", "type", "script", "title", "texting", "auto emailing"],
+        values = [["key", "type", "script", "title", "texting", "auto_emailing_booking"],
                   ["quote_text", "WEEKLY", "COLUMN C {name}", "T", "", "COLUMN F {name}"]]
         sl = self._load(values, "PHX")
         self.assertEqual(sl.get_email_script("quote_text", "PHX", "weekly"), "COLUMN F {name}")
@@ -268,7 +268,7 @@ class ScriptColumns(unittest.TestCase):
         self.assertEqual(sl.get_email_script("quote_text", "DFW", "weekly"), "COLUMN C {name}")
 
     def test_blank_or_missing_column_f_never_falls_back_to_column_c(self):
-        sl = self._load([["key", "type", "script", "title", "texting", "auto emailing"],
+        sl = self._load([["key", "type", "script", "title", "texting", "auto_emailing_booking"],
                          ["quote_text", "WEEKLY", "COLUMN C", "T", "", "  "]], "PHX")
         with self.assertRaises(ValueError):
             sl.get_email_script("quote_text", "PHX", "weekly")
